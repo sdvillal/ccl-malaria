@@ -10,5 +10,5 @@ echo "Here we compute them, possibly in parallel, generating several plain-text 
 echo "In the next step (3b-munge-rdkit-ecfps.bash) we merge and make these faster to access from our programs."
 echo "Go to sleep, (this took around 9 hours in 44 cores)."
 
-time PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/features.py ecfps-mp
+PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/features.py ecfps-mp
 

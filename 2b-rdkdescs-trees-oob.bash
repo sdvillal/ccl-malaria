@@ -15,4 +15,4 @@ echo "  - ..."
 echo "  - and something about chemistry!"
 echo "This will require quite a bit of memory and time..."
 
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" /usr/bin/time -v python2 -u ${myDir}/src/malaria/trees.py fit-trees
+PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/trees.py fit-trees

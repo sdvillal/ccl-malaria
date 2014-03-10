@@ -1,26 +1,18 @@
 # coding=utf-8
 """Analysis/plots and deployment of trees OOB results."""
-from collections import defaultdict
 from copy import copy
-from itertools import izip
 import os.path as op
 
 import h5py
-import pandas as pd
 from pandas import DataFrame
 import numpy as np
-from sklearn.isotonic import IsotonicRegression
-from sklearn.linear_model import LinearRegression
 
-from ccl_malaria import info, MALARIA_EXPS_ROOT
+from ccl_malaria import info
 from ccl_malaria.features import MalariaRDKFsExampleSet
-from ccl_malaria.logregs_fit import MALARIA_LOGREGS_EXPERIMENT_ROOT
 from ccl_malaria.molscatalog import MalariaCatalog
 from ccl_malaria.results import malaria_result_factory, compute_submissions
 from ccl_malaria.trees_fit import MALARIA_TREES_EXPERIMENT_ROOT
 from minioscail.common.configuration import split_by
-from minioscail.common.eval import kendalltau_all, rank_sort
-from minioscail.common.misc import ensure_dir
 from minioscail.common.results import ResultInDisk
 
 

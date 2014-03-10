@@ -187,47 +187,6 @@ def do_logreg_submissions(do_confirmatory=True,
                         do_screening=do_screening)
 
 
-#################
-# Feature selection via logreg odds
-#################
-
-
-#################
-# Logistic regression parameter selection
-#################
-
-def auc_f_C(df):
-    df = df[(df.folder_seed < 1)
-            & (df.num_cv_folds == 10)
-            & (df.cv_seed == 0)
-            # (df.folder_size == 0) &
-            # & (df.penalty == penalty)
-            # & (df.class_weight == 'auto')
-            & (df.tol == 1E-4)]
-    for (penalty, C, fs, class_weight), group in df.groupby(['penalty',
-                                                             'C',
-                                                             'folder_size',
-                                                             'class_weight']):
-        print class_weight, penalty, C, fs, len(group), '%.2f' % group.auc_mean.mean()
-
-
-#################
-# Effect of folding on learning and model interpretation
-#################
-
-# fold size vs. auc
-def auc_f_fold_size(df):
-    df = df[(df.folder_seed < 1) &
-            (df.num_cv_folds == 10) &
-            (df.cv_seed == 0) &
-            (df.penalty == 'l1') &
-            (df.C == 1.) &
-            (df.tol == 1E-4) &
-            (df.class_weight == 'auto')]
-    for size, group in df.groupby(['folder_size']):
-        print size, len(group), group.auc_mean.mean()
-
-
 if __name__ == '__main__':
     import argh
     parser = argh.ArghParser()

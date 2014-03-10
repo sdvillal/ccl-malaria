@@ -200,6 +200,12 @@ class MalariaCVResult(ResultInDisk):
         folder_file = op.join(self.data_dir, 'folder.pkl')
         return joblib.load(folder_file) if op.isfile(folder_file) else None
 
+    def folded2unfolded(self):
+        """Returns an array, the ith element is the fold (aka bucket) for the ith unfolded feature."""
+        h5 = op.join(self.data_dir, 'folded2unfolded.h5')
+        with h5py.File(h5) as h5:
+            return h5['f2u'][:]
+
     def remove(self):
         import shutil
         shutil.rmtree(self.eval_dir)

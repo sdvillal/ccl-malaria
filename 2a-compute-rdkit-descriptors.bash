@@ -12,5 +12,5 @@ echo "Go to sleep, (this took around 32 hours in our machine)."
 for molsSet in unl lab scr; do
   outFile="${myDir}/data/rdkit/rdkfs/${molsSet}rdkf.h5"
   params="rdkfs --start 0 --step 1 --mols ${molsSet} --output-file \"$outFile\""
-  time PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/features.py $params
+  PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/features.py $params
 done
