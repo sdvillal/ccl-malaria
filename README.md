@@ -15,7 +15,7 @@ First we need to install all the dependencies:
    * joblib >= 0.8
    * h5py >= 2.2.1
    * argh >=0.21
-- rdkit >= R2013_09 (the cheminformatics backend we use)
+- for cheminformatics, [rdkit >= R2013_09](http://www.rdkit.org/docs/Install.html)
 
 The easiest way to get (1) done is to install the free
 [anaconda python scientific distribution](https://store.continuum.io/cshop/anaconda/)
@@ -25,7 +25,7 @@ and then complete the installation of the missing libraries by running:
 pip install argh joblib
 ```
 
-[These are the instructions for installing rdkit](http://www.rdkit.org/docs/Install.html)
+
 
 Then, we just need to install CCL-Malaria by decompressing a distribution package or
 cloning the [latest version from github](https://github.com/sdvillal/ccl-malaria).
