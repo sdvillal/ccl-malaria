@@ -1,4 +1,4 @@
-# CCL-Malaria - We Build Models for Activity of Molecules against Malaria
+# CCL-Malaria - Modelling the Activity of Molecules against Malaria
 
 [First see why?](http://www.tdtproject.org/challenge-1---malaria-hts.html).
 
