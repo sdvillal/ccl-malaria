@@ -1057,9 +1057,6 @@ def cl(step=46, for_what='rdkf'):
 
 if __name__ == '__main__':
 
-    dall = detect_duplicate_features(transductive=True)
-    exit(69)
-
     parser = argh.ArghParser()
     parser.add_commands([cl, ecfps, ecfps_mp, munge_ecfps, rdkfs])
     parser.dispatch()
