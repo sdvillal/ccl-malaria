@@ -26,7 +26,7 @@ setup(
     author='Santi Villalba, Floriane Montanari',
     author_email='sdvillal@gmail.com',
     description='',
-    requires=['joblib', 'h5py', 'pandas', 'argh', 'scipy', 'cython'],
+    requires=['joblib', 'h5py', 'pandas', 'argh', 'scipy', 'cython', 'sqlalchemy'],
     cmdclass={'build_ext': build_ext},
     ext_modules=[common_faster],
     script_args=['build_ext', '--inplace']
