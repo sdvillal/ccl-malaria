@@ -1,0 +1,30 @@
+name: ccl-malaria
+channels:
+  - rdkit
+  - conda-forge
+  - defaults
+dependencies:
+  - python=2.7
+  - future
+  - numpy
+  - scipy
+  - pandas
+  - h5py
+  - joblib
+  - scikit-learn
+  - cython
+  - rdkit
+  - argh
+  # so we can run notebooks
+  - jupyter
+  - matplotlib
+  - pillow
+  # diffing notebooks
+  - nbdime
+  # testing
+  - pytest
+  - pytest-cov
+  - pytest-pep8
+  - pip:
+    - argh
+    - "--editable=./"  # weird syntax until https://github.com/conda/conda/pull/3969 is merged
