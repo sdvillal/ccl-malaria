@@ -1,5 +1,6 @@
 # coding=utf-8
 """Read the original smiles data, create convenient molecules catalogs."""
+from __future__ import print_function, division
 from collections import Counter
 import gzip
 import itertools
@@ -17,9 +18,7 @@ from ccl_malaria import MALARIA_DATA_ROOT, MALARIA_ORIGINAL_DATA_ROOT, MALARIA_I
 from ccl_malaria.rdkit_utils import to_rdkit_mol
 
 
-####
-####--- Lazy data download
-####
+# --- Lazy data download
 
 def _labelled_smiles_file():
     return download('http://www.tdtproject.org/uploads/6/8/2/0/6820495/malariahts_trainingset.txt.gz',
@@ -45,9 +44,7 @@ def _malaria_screening_sdf_file():
                     info=info)
 
 
-#####
-#####---Data in, relabelling
-#####
+# ---Data in, relabelling
 
 
 def relabel_pEC50(sample, threshold=5):
@@ -79,15 +76,15 @@ def read_labelled_smiles(relabel_func=relabel_pEC50):
 
     For example:
     >>> generator = read_labelled_smiles()
-    >>> print generator.next()
+    >>> print(next(generator))
     ('SJ000241685-1', -5.42492139537131, -22.9358967463118, 'false', nan, 'Cc1ccccc1c2nsc(SCC(=O)Nc3ccc(Br)cc3)n2')
-    >>> print generator.next()
+    >>> print(next(generator))
     ('SJ000241765-1', 62.8825610415562, 28.7677982751592, 'ambiguous', nan, 'O=C(Nc1nc(cs1)c2ccccn2)c3ccc(cc3)C#N')
     >>> ids = {'SJ000241685-1', 'SJ000241765-1'}
     >>> for row in generator:
     ...    ids.add(row[0])
     >>> num_molecules = 305569 - 1  # As given by zcat | wc -l
-    >>> print 'Are there repeated ids in the labelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes'
+    >>> print('Are there repeated ids in the labelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the labelled set? No.
     """
     with gzip.open(_labelled_smiles_file()) as reader:
@@ -127,15 +124,15 @@ def read_unlabelled_smiles():
 
     For example:
     >>> generator = read_unlabelled_smiles()
-    >>> print generator.next()
+    >>> print(next(generator))
     ('SJ000551065-1', 'Cc1ccc(OCC(O)CNC2CCCCC2)cc1')
-    >>> print generator.next()
+    >>> print(next(generator))
     ('SJ000551074-1', 'CCCCN(CCCC)CC(O)COc1ccccc1[N+](=O)[O-]')
     >>> ids = {'SJ000241685-1', 'SJ000241765-1'}
     >>> for molid, _ in generator:
     ...    ids.add(molid)
     >>> num_molecules = 1057 - 1  # As given by wc -l
-    >>> print 'Are there repeated ids in the unlabelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes'
+    >>> print('Are there repeated ids in the unlabelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the unlabelled set? No.
     """
     with open(_unlabelled_smiles_file()) as reader:
@@ -152,15 +149,15 @@ def read_screening_smiles():
 
     For example:
     >>> generator = read_screening_smiles()
-    >>> print generator.next()
+    >>> print(next(generator))
     ('10019', 'COC(=O)C12NCC3(C2(C)CCC3C1)C')
-    >>> print generator.next()
+    >>> print(next(generator))
     ('10023', 'Oc1noc(c1)C1CCNCC1')
     >>> ids = {'10019', '10023'}
     >>> for molid, _ in generator:
     ...    ids.add(molid)
     >>> num_molecules = 5488504 - 1  # As given by zcat | wc -l
-    >>> print 'Are there repeated ids in the screening set? %s.' % 'No' if len(ids) == num_molecules else 'Yes'
+    >>> print('Are there repeated ids in the screening set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the screening set? No.
     """
     with gzip.open(_screening_smiles_file()) as reader:
@@ -186,9 +183,7 @@ MOLS2MOLS = {
 }
 
 
-#####
-#####--- Faster molid->label and molids present in the original files.
-#####
+# --- Faster molid->label and molids present in the original files.
 
 def molid_lab():
     """Returns a map {molid->label} for the labelled molecules."""
@@ -225,9 +220,7 @@ def scr_molids():
     return _molids_cache(read_screening_smiles(), op.join(MALARIA_INDICES_ROOT, 'scr_molids.txt'))
 
 
-#####
-#####--- Memmapped catalog of rdkit molecules
-#####
+# --- Memmapped catalog of rdkit molecules
 #
 # Some numbers:
 #   - Total number of molecules: 5795127
@@ -239,11 +232,10 @@ def scr_molids():
 #
 # Just for fun, this could be better done with a full-blown DB (e.g. using the postgres rdkit cartridge).
 # But we do not want postgres as a dependency for this competition...
-######
 
 class MemMappedMols(object):
     # TODO: maybe periodically reopen the memmapped handle to avoid memory leaks
-    #       probably with implementin reopen functionality wired in _memmapped_data
+    #       probably with implementing reopen functionality wired in _memmapped_data
     #       Should not be necessary:
     #       http://stackoverflow.com/questions/20713063/writing-into-a-numpy-memmap-still-loads-into-ram-memory
     # TODO: make this a context manager
@@ -292,6 +284,7 @@ class MemMappedMols(object):
         if self._molid2coords is None:
             self._molid2coords = {}
             self._coords = np.load(self._coords_file)
+            # noinspection PyTypeChecker
             for i, molid in enumerate(self.molids()):
                 self._molid2coords[molid] = self._coords[i]
         return self._molid2coords
@@ -305,6 +298,7 @@ class MemMappedMols(object):
         base, length = self._index().get(molid, (-1, 0))
         if base < 0:
             return None
+        # noinspection PyUnresolvedReferences
         return Chem.Mol(self._memmapped_data()[base:base+length])
 
     def mols(self, molids):
@@ -353,6 +347,7 @@ def scr_molid2mol_memmapped_catalog():
     return MemMappedMols(op.join(MALARIA_DATA_ROOT, 'rdkit', 'mols', 'scr'))
 
 
+# noinspection PyUnresolvedReferences
 def build_benchmark_check_rdkmols_catalog(mmapdir, molit=read_labelled_only_smiles, checks=False, overwrite=False):
     """Builds a memmapped catalog {molid->rdkbytes} from a (molid, smiles) iterator.
     tests it and compares to sequential recreation of the molecules from smiles.
@@ -378,6 +373,7 @@ def build_benchmark_check_rdkmols_catalog(mmapdir, molit=read_labelled_only_smil
     info('Benchmarking contiguous memmap reading')
     start = time()
     molcount = 0
+    # noinspection PyTypeChecker
     for molid in mmms.molids():
         mmms.mol(molid)
         molcount += 1
@@ -430,9 +426,7 @@ def catalog_malaria_mols(overwrite=False, checks=False):
     info('ALL DONE')
 
 
-#####
-#####--- Fast retrieval of information from molids
-#####
+# --- Fast retrieval of information from molids
 
 
 class MalariaCatalog(object):
@@ -524,18 +518,21 @@ class MalariaCatalog(object):
     def lab2i(self, molid):
         """Returns the index of a labelled molecule in the original file."""
         if self._lm2index is None:
+            # noinspection PyTypeChecker
             self._lm2index = {molid: i for i, molid in enumerate(self.lab())}
         return self._lm2index.get(molid, None)
 
     def unl2i(self, molid):
         """Returns the index of an unlabelled molecule in the original file."""
         if self._um2index is None:
+            # noinspection PyTypeChecker
             self._um2index = {molid: i for i, molid in enumerate(self.unl())}
         return self._um2index.get(molid, None)
 
     def scr2i(self, molid):
         """Returns the index of a screening molecule in the original file."""
         if self._sm2index is None:
+            # noinspection PyTypeChecker
             self._sm2index = {molid: i for i, molid in enumerate(self.scr())}
         return self._sm2index.get(molid, None)
 
@@ -564,14 +561,17 @@ class MalariaCatalog(object):
 
     def num_lab(self):
         """Returns the number of labelled molecules."""
+        # noinspection PyTypeChecker
         return len(self.lab())
 
     def num_unl(self):
         """Returns the number of unlabelled (competition) molecules."""
+        # noinspection PyTypeChecker
         return len(self.unl())
 
     def num_scr(self):
         """Returns the number of unlabelled (screening) molecules."""
+        # noinspection PyTypeChecker
         return len(self.scr())
 
     def num_known(self):
@@ -609,9 +609,7 @@ class MalariaCatalog(object):
         return map(self.molid2mol, molids)
 
 
-#####
-#####--- Some pandas goodies
-#####
+# --- Some pandas goodies
 
 def read_labelled_smiles_with_pandas():
     """Returns a pandas dataframe with the labelled smiles data.
@@ -627,7 +625,7 @@ def read_labelled_smiles_with_pandas():
 
     Examples:
     >>> df = read_labelled_smiles_with_pandas()
-    >>> print df
+    >>> print(df)
     <class 'pandas.core.frame.DataFrame'>
     Index: 305568 entries, SJ000241685-1 to SJ000257851-1
     Data columns (total 6 columns):
@@ -638,11 +636,11 @@ def read_labelled_smiles_with_pandas():
     pEC50     1524  non-null values
     smiles    305568  non-null values
     dtypes: float64(3), object(3)
-    >>> print abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9
+    >>> print(abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9)
     True
-    >>> print df.ix['SJ000241685-1']['smiles']
+    >>> print(df.ix['SJ000241685-1']['smiles'])
     Cc1ccccc1c2nsc(SCC(=O)Nc3ccc(Br)cc3)n2
-    >>> print pd.isnull(df.ix['SJ000241685-1']['pEC50'])
+    >>> print(pd.isnull(df.ix['SJ000241685-1']['pEC50']))
     True
     """
     df = pd.read_csv(_labelled_smiles_file(), compression='gzip', sep='\t')
@@ -658,9 +656,9 @@ def read_unlabelled_smiles_with_pandas():
 
     Examples:
     >>> df = read_unlabelled_smiles_with_pandas()
-    >>> print df.ix['SJ000551065-1']['smiles']
+    >>> print(df.ix['SJ000551065-1']['smiles'])
     Cc1ccc(OCC(O)CNC2CCCCC2)cc1
-    >>> print df.ix['SJ000551074-1']['smiles']
+    >>> print(df.ix['SJ000551074-1']['smiles'])
     CCCCN(CCCC)CC(O)COc1ccccc1[N+](=O)[O-]
     """
     df = pd.read_csv(_unlabelled_smiles_file(), sep='\t')
@@ -673,9 +671,9 @@ def read_screening_smiles_with_pandas():
     """Returns a pandas dataframe with the screening smiles data indexed by molid and with one extra column, smiles.
     Examples:
     >>> df = read_screening_smiles_with_pandas()
-    >>> print df.ix['10019']['smiles']
+    >>> print(df.ix['10019']['smiles'])
     COC(=O)C12NCC3(C2(C)CCC3C1)C
-    >>> print df.ix['10023']['smiles']
+    >>> print(df.ix['10023']['smiles'])
     Oc1noc(c1)C1CCNCC1
     """
     df = pd.read_csv(_screening_smiles_file(), compression='gzip', sep=' ', converters={'parent_id': str})
@@ -692,21 +690,21 @@ def read_all_smiles_with_pandas():
 
     For example:
     >>> df = read_all_smiles_with_pandas()
-    >>> print abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9
+    >>> print(abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9)
     True
-    >>> print df.ix['SJ000241685-1']['smiles']
+    >>> print(df.ix['SJ000241685-1']['smiles'])
     Cc1ccccc1c2nsc(SCC(=O)Nc3ccc(Br)cc3)n2
-    >>> print pd.isnull(df.ix['SJ000241685-1']['pEC50'])
+    >>> print(pd.isnull(df.ix['SJ000241685-1']['pEC50']))
     True
-    >>> print df.ix['SJ000551065-1']['smiles']
+    >>> print(df.ix['SJ000551065-1']['smiles'])
     Cc1ccc(OCC(O)CNC2CCCCC2)cc1
-    >>> print pd.isnull(df.ix['SJ000551065-1']['pEC50'])
+    >>> print(pd.isnull(df.ix['SJ000551065-1']['pEC50']))
     True
-    >>> print df.ix['SJ000551074-1']['smiles']
+    >>> print(df.ix['SJ000551074-1']['smiles'])
     CCCCN(CCCC)CC(O)COc1ccccc1[N+](=O)[O-]
-    >>> print df.ix['10019']['smiles']
+    >>> print(df.ix['10019']['smiles'])
     COC(=O)C12NCC3(C2(C)CCC3C1)C
-    >>> print df.ix['10023']['smiles']
+    >>> print(df.ix['10023']['smiles'])
     Oc1noc(c1)C1CCNCC1
     """
     labelled = read_labelled_smiles_with_pandas()
