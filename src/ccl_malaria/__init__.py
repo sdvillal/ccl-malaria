@@ -7,9 +7,9 @@ import logging
 import os.path as op
 from minioscail.common.misc import ensure_dir
 
-################
-# Paths and other constants.
-################
+__version__ = '0.2-dev0'
+
+# --- Paths and other constants.
 
 # Make everything relative to the source location...
 _THIS_PATH = op.abspath(op.dirname(__file__))  # maybe jump to pkgutils?
@@ -25,9 +25,7 @@ ensure_dir(MALARIA_INDICES_ROOT)
 MALARIA_EXPS_ROOT = op.join(MALARIA_DATA_ROOT, 'experiments')
 ensure_dir(MALARIA_EXPS_ROOT)
 
-################
-# Common logger for the malaria code.
-################
+# --- Common logger for the malaria code.
 
 _logger = logging.getLogger('malaria')
 _logger.setLevel(logging.DEBUG)
