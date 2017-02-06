@@ -9,6 +9,7 @@ from time import time
 
 import numpy as np
 from rdkit import Chem
+import pandas as pd
 
 from minioscail.common.misc import download, ensure_dir, is_iterable
 from ccl_malaria import info, warning
@@ -606,6 +607,147 @@ class MalariaCatalog(object):
         if not is_iterable(molids):
             molids = (molids,)
         return map(self.molid2mol, molids)
+
+
+#####
+#####--- Some pandas goodies
+#####
+
+def read_labelled_smiles_with_pandas():
+    """Returns a pandas dataframe with the labelled smiles data.
+    The data frame:
+      - is indexed with the molecules id
+      - has easier to remember column names:
+        * molid = SAMPLE
+        * green = green fluorescence intensity
+        * red = red fluorescence intensity
+        * hit = hit? [true|false|ambiguous]
+        * pEC50 = confirmatory pEC50
+        * smiles = canonical smiles
+
+    Examples:
+    >>> df = read_labelled_smiles_with_pandas()
+    >>> print df
+    <class 'pandas.core.frame.DataFrame'>
+    Index: 305568 entries, SJ000241685-1 to SJ000257851-1
+    Data columns (total 6 columns):
+    molid     305568  non-null values
+    green     305568  non-null values
+    red       305568  non-null values
+    hit       305568  non-null values
+    pEC50     1524  non-null values
+    smiles    305568  non-null values
+    dtypes: float64(3), object(3)
+    >>> print abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9
+    True
+    >>> print df.ix['SJ000241685-1']['smiles']
+    Cc1ccccc1c2nsc(SCC(=O)Nc3ccc(Br)cc3)n2
+    >>> print pd.isnull(df.ix['SJ000241685-1']['pEC50'])
+    True
+    """
+    df = pd.read_csv(_labelled_smiles_file(), compression='gzip', sep='\t')
+    # Name normalization: do not prefix using the strain and use our usual names
+    # SAMPLE Pf3D7_ps_green Pf3D7_ps_red Pf3D7_ps_hit Pf3D7_pEC50 Canonical_Smiles
+    df.columns = ('molid', 'green', 'red', 'hit', 'pEC50', 'smiles')
+    df.set_index(df.molid, inplace=True)
+    return df
+
+
+def read_unlabelled_smiles_with_pandas():
+    """Returns a pandas dataframe with the unlabelled smiles data indexed by molid and with one extra column, smiles.
+
+    Examples:
+    >>> df = read_unlabelled_smiles_with_pandas()
+    >>> print df.ix['SJ000551065-1']['smiles']
+    Cc1ccc(OCC(O)CNC2CCCCC2)cc1
+    >>> print df.ix['SJ000551074-1']['smiles']
+    CCCCN(CCCC)CC(O)COc1ccccc1[N+](=O)[O-]
+    """
+    df = pd.read_csv(_unlabelled_smiles_file(), sep='\t')
+    df.columns = ('molid', 'smiles')
+    df.set_index(df.molid, inplace=True)
+    return df
+
+
+def read_screening_smiles_with_pandas():
+    """Returns a pandas dataframe with the screening smiles data indexed by molid and with one extra column, smiles.
+    Examples:
+    >>> df = read_screening_smiles_with_pandas()
+    >>> print df.ix['10019']['smiles']
+    COC(=O)C12NCC3(C2(C)CCC3C1)C
+    >>> print df.ix['10023']['smiles']
+    Oc1noc(c1)C1CCNCC1
+    """
+    df = pd.read_csv(_screening_smiles_file(), compression='gzip', sep=' ', converters={'parent_id': str})
+    df.columns = ('smiles', 'molid')
+    df = df[['molid', 'smiles']]
+    df.set_index(df.molid, inplace=True)
+    return df
+
+
+def read_all_smiles_with_pandas():
+    """Returns a big-fat dataframe with all the smiles for the competition.
+
+    The dataframe has the same column as the labelled one, the unlabelled molecules get missing values on the labels.
+
+    For example:
+    >>> df = read_all_smiles_with_pandas()
+    >>> print abs(df.ix['SJ000241685-1']['red'] + 22.9358967463118) < 1E-9
+    True
+    >>> print df.ix['SJ000241685-1']['smiles']
+    Cc1ccccc1c2nsc(SCC(=O)Nc3ccc(Br)cc3)n2
+    >>> print pd.isnull(df.ix['SJ000241685-1']['pEC50'])
+    True
+    >>> print df.ix['SJ000551065-1']['smiles']
+    Cc1ccc(OCC(O)CNC2CCCCC2)cc1
+    >>> print pd.isnull(df.ix['SJ000551065-1']['pEC50'])
+    True
+    >>> print df.ix['SJ000551074-1']['smiles']
+    CCCCN(CCCC)CC(O)COc1ccccc1[N+](=O)[O-]
+    >>> print df.ix['10019']['smiles']
+    COC(=O)C12NCC3(C2(C)CCC3C1)C
+    >>> print df.ix['10023']['smiles']
+    Oc1noc(c1)C1CCNCC1
+    """
+    labelled = read_labelled_smiles_with_pandas()
+    unlabelled = read_unlabelled_smiles_with_pandas()
+    screening = read_screening_smiles_with_pandas()
+    return labelled.append(unlabelled).append(screening)
+
+
+class PandasQueries(object):
+    """Just a namespace to group some queries over pandas dataframes."""
+    @staticmethod
+    def pos(df=None):
+        if df is None:
+            df = read_labelled_smiles_with_pandas()
+        return df[df['hit'] == 'true']
+
+    @staticmethod
+    def neg(df=None):
+        if df is None:
+            df = read_labelled_smiles_with_pandas()
+        return df[df['hit'] == 'false']
+
+    @staticmethod
+    def amb(df=None):
+        if df is None:
+            df = read_labelled_smiles_with_pandas()
+        return df[df['hit'] == 'ambiguous']
+
+    @staticmethod
+    def unk(df=None):
+        if df is None:
+            unlabelled = read_unlabelled_smiles_with_pandas()
+            screening = read_screening_smiles_with_pandas()
+            return unlabelled.append(screening)
+        return df[pd.isnull(df.green)]
+
+    @staticmethod
+    def confirmed(df=None):
+        if df is None:
+            df = read_labelled_smiles_with_pandas()
+        return df[~pd.isnull(df.pEC50)]
 
 
 if __name__ == '__main__':

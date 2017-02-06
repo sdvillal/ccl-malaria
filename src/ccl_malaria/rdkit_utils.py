@@ -1,10 +1,13 @@
 # coding=utf-8
-"""Some utilties over rdkit."""
+"""Molecule manipulation using rdkit."""
 from __future__ import print_function
 from collections import Iterable
 from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem
 import numpy as np
+from rdkit.Chem.PropertyMol import PropertyMol
+from ccl_malaria import warning
+from collections import defaultdict
 
 
 ##################################################
@@ -13,14 +16,7 @@ import numpy as np
 #  - http://www.rdkit.org/docs/GettingStartedInPython.html#list-of-available-descriptors
 #  - http://code.google.com/p/rdkit/wiki/DescriptorsInTheRDKit
 #  - http://www.rdkit.org/docs/api/rdkit.Chem.Descriptors-module.html
-################################
-# TODO: implement properly topliss
-# TODO: can we somehow implement atom-based descriptors, like charges ('GasteigerCharges')?
-# TODO: document how easily one gets missing values when computing rdk descriptors
-# TODO: look at rdk pandas integration
 ##################################################
-from rdkit.Chem.PropertyMol import PropertyMol
-from ccl_malaria import warning
 
 
 def discover_rdk_descriptors(verbose=False):
@@ -92,6 +88,28 @@ def explain_circular_substructure(mol,
                                     kekuleSmiles=kekule,
                                     canonical=canonical,
                                     allBondsExplicit=all_bonds_explicit)
+
+
+def unfolded_fingerprint(mol, max_radius=100, fcfp=False):
+    if isinstance(mol, basestring):
+        mol = to_rdkit_mol(mol)  # TODO: check it is an rdkit mol otherwise
+    fpsinfo = {}
+    # N.B. We won't actually use rdkit hash, so we won't ask for nonzero values...
+    # Is there a way of asking rdkit to give us this directly?
+    AllChem.GetMorganFingerprint(mol, max_radius, bitInfo=fpsinfo, useFeatures=fcfp)
+    counts = defaultdict(int)
+    centers = defaultdict(list)
+    for bit_descs in fpsinfo.values():
+        for center, radius in bit_descs:
+            cansmiles = explain_circular_substructure(mol, center, radius)
+            counts[cansmiles] += 1
+            centers[cansmiles].append((center, radius))
+    return counts, centers
+
+
+##################################################
+# Instantiation of molecules
+##################################################
 
 
 def to_rdkit_mol(smiles, molid=None, sanitize=True, to2D=False, to3D=False, toPropertyMol=False):

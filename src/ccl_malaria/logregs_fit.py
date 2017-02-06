@@ -20,7 +20,7 @@ from ccl_malaria import MALARIA_EXPS_ROOT, info
 from minioscail.common.eval import cv_splits, enrichment_at
 from ccl_malaria.features import MurmurFolder, MalariaFingerprintsExampleSet
 from ccl_malaria.results import predict_malaria_unlabelled, save_molids
-from minioscail.common.configuration import mlexp_info_helper
+from minioscail.common.config import mlexp_info_helper
 from minioscail.common.misc import ensure_dir, giveupthefunc
 
 
@@ -95,10 +95,10 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
     folder = None if fingerprint_fold_size < 1 else MurmurFolder(seed=fingerprint_folder_seed,
                                                                  fold_size=fingerprint_fold_size)
     rf_lab, rf_amb, rf_unl, rf_scr = malaria_logreg_fpt_providers(folder)
-    info('Data description: %s' % rf_lab.configuration().id(full=True))
+    info('Data description: %s' % rf_lab.who().id(nonids_too=True))
 
     # Experiment context: data
-    data_id = rf_lab.configuration().id(full=True)
+    data_id = rf_lab.who().id(nonids_too=True)
     data_dir = op.join(dest_dir, data_id)
     ensure_dir(data_dir)
 

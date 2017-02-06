@@ -16,7 +16,7 @@ from ccl_malaria import MALARIA_EXPS_ROOT
 from minioscail.common.eval import enrichment_at
 from ccl_malaria.features import MalariaRDKFsExampleSet
 from ccl_malaria.results import save_molids
-from minioscail.common.configuration import mlexp_info_helper
+from minioscail.common.config import mlexp_info_helper
 from minioscail.common.misc import ensure_dir, giveupthefunc, fill_missing_scores
 
 
@@ -48,11 +48,11 @@ def fit_trees(dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
     rf_scr = MalariaRDKFsExampleSet(dset='scr', remove_ambiguous=False)
     rf_amb = MalariaRDKFsExampleSet(dset='amb')
     # A bit of logging
-    info('Data description: %s' % rf_lab.configuration().id(full=True))
+    info('Data description: %s' % rf_lab.configuration().id(nonids_too=True))
     info('ne=%d; nf=%d' % rf_lab.X().shape)
 
     # Experiment context: data
-    data_id = rf_lab.configuration().id(full=True)  # TODO: bring hashing from oscail
+    data_id = rf_lab.configuration().id(nonids_too=True)  # TODO: bring hashing from oscail
     data_dir = op.join(dest_dir, data_id)
     ensure_dir(data_dir)
 

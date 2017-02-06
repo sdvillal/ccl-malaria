@@ -1,12 +1,13 @@
 # coding=utf-8
-from glob import glob
-from itertools import izip
 import json
 import os.path as op
+from glob import glob
+from itertools import izip
 
 import h5py
 import joblib
 import numpy as np
+import pandas as pd
 from pandas import DataFrame, Series
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LinearRegression
@@ -16,7 +17,6 @@ from ccl_malaria import info, MALARIA_EXPS_ROOT
 from ccl_malaria.molscatalog import MalariaCatalog
 from minioscail.common.eval import kendalltau, rank_sort
 from minioscail.common.results import OOBResult, ResultInDisk
-import pandas as pd
 
 
 ###################
@@ -74,7 +74,6 @@ def malaria_result_factory(root_dir):
 
 
 class MalariaCVResult(ResultInDisk):
-
     def __init__(self, root_dir, ids_cache=None):
         """A result for a model evaluated using cross validation, practical for the malaria competition."""
         # TODO: refactor common parts to CVResult
@@ -83,10 +82,10 @@ class MalariaCVResult(ResultInDisk):
 
     def is_done(self):
         return super(MalariaCVResult, self).is_done() or self.num_present_folds() > 0
-            # There was once upon a time a bug
-            # No info.json was written
-            # if a fold was not good...
-            # Fix at filesystem level!
+        # There was once upon a time a bug
+        # No info.json was written
+        # if a fold was not good...
+        # Fix at filesystem level!
 
     def logreg_coefs(self, fold_num):
         with h5py.File(self.fold_h5(fold_num)) as h5:
@@ -311,6 +310,7 @@ def compute_heldout(dset,
 
     return molids, scores
 
+
 def compute_submissions(prefix,
                         dest_dir,
                         deployers,
@@ -319,7 +319,6 @@ def compute_submissions(prefix,
                         do_confirmatory=True,
                         do_heldout=True,
                         do_screening=True):
-
     info('Computing submissions for %s' % prefix)
 
     mc = MalariaCatalog()  # For performance, maybe this should be singleton...
@@ -361,15 +360,19 @@ def compute_submissions(prefix,
     if do_screening:
         do_predict('scr', select_top=1000)
 
+
 #########
 # Computation of averaged and stacked final submissions
 #########
 
-def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
+# noinspection PyTypeChecker
+def final_merged_submissions(calibrate=False,
+                             select_top_scr=None,
+                             dest_dir=MALARIA_EXPS_ROOT):
     """Very ad-hoc merge of submissions obtained with trees and logistic regressors."""
 
     #####
-    #0 Preparations
+    # 0 Preparations
     #####
 
     # Avoid circular imports
@@ -393,7 +396,7 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
                 writer.write('%s,%s,%.6f\n' % (molid, smiles, score))
 
     #####
-    #1 Robust merge using pandas
+    # 1 Robust merge using pandas
     #####
     def read_average_merge(root, prefix):
         hit = pd.read_pickle(op.join(root, '%s_hitSelection.pkl' % prefix))
@@ -403,12 +406,13 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
         unl = pd.read_pickle(op.join(root, '%s_unl-averaged.pkl' % prefix))
         scr = pd.read_pickle(op.join(root, '%s_scr-averaged.pkl' % prefix))
         return lab, amb, unl, scr
+
     tlab, tamb, tunl, tscr = read_average_merge(MALARIA_TREES_EXPERIMENT_ROOT, 'trees')
     llab, lamb, lunl, lscr = read_average_merge(MALARIA_LOGREGS_EXPERIMENT_ROOT, 'logreg')
 
     lab = DataFrame({'trees': tlab, 'logregs': llab})
     lab['labels'] = mc.molids2labels(lab.index, as01=True)
-    assert np.sum(np.isnan(lab.labels)) == 0
+    assert np.sum(np.isnan(lab['labels'])) == 0
     amb = DataFrame({'trees': tamb, 'logregs': lamb})
     unl = DataFrame({'trees': tunl, 'logregs': lunl})
     scr = DataFrame({'trees': tscr, 'logregs': lscr})
@@ -420,7 +424,7 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
     scr.dropna(inplace=True)
 
     #####
-    #2 Calibration on labelling - careful with overfitting for hitList, do it in cross-val fashion
+    # 2 Calibration on labelling - careful with overfitting for hitList, do it in cross-val fashion
     #####
     def calibrate_row(row):
         calibrator = IsotonicRegression(y_min=0, y_max=1)
@@ -431,12 +435,13 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
         amb[row] = calibrator.predict(amb[row].values)
         unl[row] = calibrator.predict(unl[row].values)
         scr[row] = calibrator.predict(scr[row].values)
+
     if calibrate:
         calibrate_row('trees')
         calibrate_row('logregs')
 
     #####
-    #3 Average for the submission in lab-amb
+    # 3 Average for the submission in lab-amb
     #####
     submission_lab = (lab.trees + lab.logregs) / 2
     submission_amb = (amb.trees + amb.logregs) / 2
@@ -446,7 +451,7 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
     save_submission(submission_hts, outfile)
 
     #####
-    #4 Average predictions for unlabelled
+    # 4 Average predictions for unlabelled
     #####
     submission_unl_avg = (unl.trees + unl.logregs) / 2
     outfile = op.join(dest_dir, 'final-%s-avg-unl.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
@@ -454,13 +459,13 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
 
     submission_scr_avg = (scr.trees + scr.logregs) / 2
     outfile = op.join(dest_dir, 'final-%s-avg-scr.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
-    save_submission(submission_scr_avg, outfile, select_top=1000)
+    save_submission(submission_scr_avg, outfile, select_top=select_top_scr)
 
     #####
-    #5 Stacked (linear regression) for unlabelled
+    # 5 Stacked (linear regression) for unlabelled
     #####
     stacker = LinearRegression()
-    stacker.fit(lab[['trees', 'logregs']], lab.labels)
+    stacker.fit(lab[['trees', 'logregs']], lab['labels'])
 
     submission_unl_st = Series(data=stacker.predict(unl[['trees', 'logregs']]), index=unl.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-unl.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
@@ -468,12 +473,12 @@ def final_merged_submissions(calibrate=False, dest_dir=MALARIA_EXPS_ROOT):
 
     submission_scr_st = Series(data=stacker.predict(scr[['trees', 'logregs']]), index=scr.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-scr.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
-    save_submission(submission_scr_st, outfile, select_top=1000)
+    save_submission(submission_scr_st, outfile, select_top=select_top_scr)
 
 
 if __name__ == '__main__':
-
     import argh
+
     parser = argh.ArghParser()
     parser.add_commands([final_merged_submissions])
     parser.dispatch()

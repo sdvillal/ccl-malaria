@@ -12,7 +12,7 @@ from ccl_malaria.features import MalariaRDKFsExampleSet
 from ccl_malaria.molscatalog import MalariaCatalog
 from ccl_malaria.results import malaria_result_factory, compute_submissions
 from ccl_malaria.trees_fit import MALARIA_TREES_EXPERIMENT_ROOT
-from minioscail.common.configuration import split_by
+from minioscail.common.config import parse_id_string
 from minioscail.common.results import ResultInDisk
 
 
@@ -55,7 +55,7 @@ def trees_results_to_pandas(common_molids_cache=False):
         rdict = copy(result.info())
         rdict['result'] = result
         # Some more ad-hoc keys for the model
-        model_params = split_by(result.model_setup_id())[1]
+        model_params = parse_id_string(result.model_setup_id())[1]
         rdict['model_num_trees'] = int(model_params['num_trees'])
         rdict['model_seed'] = int(model_params['seed'])
         rdict['model_type'] = 'ExtraTrees' if model_params['etc'] else 'RandomForest'

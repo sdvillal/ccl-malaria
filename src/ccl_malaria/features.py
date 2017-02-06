@@ -21,7 +21,7 @@ from ccl_malaria import info
 from ccl_malaria import MALARIA_DATA_ROOT
 from ccl_malaria.molscatalog import read_smiles_ultraiterator, MOLS2MOLS, MalariaCatalog
 from ccl_malaria.rdkit_utils import explain_circular_substructure, RDKitDescriptorsComputer, to_rdkit_mol
-from minioscail.common.configuration import Configurable
+from minioscail.common.config import Configurable
 from minioscail.common.misc import ensure_dir, is_iterable
 
 
@@ -288,7 +288,7 @@ _MALARIA_ECFPS_PARALLEL_RESULTS_DIR = op.join(_MALARIA_ECFPS_DIR, 'from_workers'
 
 
 def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=False):
-    """Returns a (molid, smiles) processor that computes ecfps on the smiles and stores then in a text file.
+    """Returns a (molid, smiles) processor that computes ecfps on the smiles and stores them in a text file.
 
     Parameters:
       - output_file: where the fingerprints will be written; this file will be overwritten and gzipped.
