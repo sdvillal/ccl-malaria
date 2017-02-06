@@ -1,6 +1,7 @@
 # coding=utf-8
 """A jumble of seemingly useful stuff."""
 import collections
+import datetime
 import os
 import inspect
 import gc
@@ -15,6 +16,7 @@ import itertools
 import urllib
 import numpy as np
 from scipy.stats import nanmedian
+from minioscail.integration.thirdparty import ntplib
 
 
 def download(url, dest, overwrite=False, info=lambda msg: None):
@@ -213,6 +215,7 @@ def function_params(function):
 
 
 def partial2call(p, positional=None, keywords=None):
+    # FIXME: support built-in functions
     if not keywords:
         keywords = {}
     if not positional:
@@ -237,46 +240,6 @@ def partial2call(p, positional=None, keywords=None):
                             positional=positional + list(p.args),                  # N.B. order matters
                             keywords=dict(p.keywords.items() + keywords.items()))  # N.B. order matters
     raise Exception('Only partials and functions are allowed, %r is none of them' % p)
-
-
-#########################
-# Git stuff
-#########################
-# def git_repo(root=None):
-#     return Repo(root) if root else Repo(op.dirname(__file__))
-#
-#
-# def git_master_head_commit_hexsha(root=None):
-#     return git_repo(root).heads.master.commit.hexsha
-#
-#
-# def git_is_dirty(root=None):
-#     return git_repo(root).is_dirty()
-#
-#
-# def git_current_rev(root=None):
-#     print git_repo(root).rev_parse
-#
-#
-# def git_dirty_files():
-#     pass
-
-#repo = git_repo()
-#heads =  repo.heads
-#print heads.master.commit
-#print repo.description
-#print repo.git.status()
-#print repo.untracked_files
-#print repo.active_branch
-#print repo.heads
-
-####################################
-# Other problems found
-####################################
-# - MULTIPROCESSING UNABLE TO PICKLE "LOCAL" FUNCTIONS
-#   http://stackoverflow.com/questions/3288595/multiprocessing-using-pool-map-on-a-function-defined-in-a-class
-#   Use joblib's delayed
-####################################
 
 
 ###########
@@ -319,3 +282,17 @@ def fill_missing_scores(scores):
     scores2 = scores.copy()
     scores2[~np.isfinite(scores2)] = nanmedian(scores2)
     return scores2
+
+
+def internet_time(ntpservers=('ntp-0.imp.univie.ac.at', 'europe.pool.ntp.org')):
+    """Makes a best effort to retrieve current UTC time from a reliable internet source.
+    Returns a string like "Thu, 13 Mar 2014 11:35:41 UTC"
+    """
+    # Maybe also parse from, e.g., the webpage of the time service of the U.S. army
+    try:
+        for server in ntpservers:
+            response = ntplib.NTPClient().request(server, version=3)
+            dt = datetime.datetime.utcfromtimestamp(response.tx_time)
+            return dt.strftime('%a, %d %b %Y %H:%M:%S UTC')
+    except ImportError:
+        return None
