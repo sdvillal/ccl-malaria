@@ -1,33 +1,39 @@
-from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
-import numpy as np
-
-#---Cython extensions
-common_faster = Extension('oscail.common.faster',
-                          ['oscail/common/faster.pyx'],
-                          include_dirs=[np.get_include()],
-                          extra_compile_args=['-fopenmp'],  # '-O3'
-                          extra_link_args=['-fopenmp'])
-
+from setuptools import setup
 
 setup(
     name='ccl_malaria',  # Cricket-Chorus-Learn (malaria)
-    version='0.1rc1',
-    packages=['malaria',
-              'malaria.sandbox',
-              'malaria.sandbox.threeD',
+    version='0.2-dev0',
+    license='BSD 3 clause',
+    url='https://github.com/sdvillal/ccl-malaria',
+    packages=['ccl_malaria',
               'minioscail',
               'minioscail.common',
-              'integration'],
-    package_dir={'': 'src'},
-    url='',
-    license='',
+              'minioscail.common.tests'],
     author='Santi Villalba, Floriane Montanari',
     author_email='sdvillal@gmail.com',
-    description='',
-    requires=['joblib', 'h5py', 'pandas', 'argh', 'scipy', 'cython', 'sqlalchemy'],
-    cmdclass={'build_ext': build_ext},
-    ext_modules=[common_faster],
-    script_args=['build_ext', '--inplace']
+    description='Entry for the TDT Malaria 2014 Challenge',
+    install_requires=['future',
+                      'numpy',
+                      'scipy',
+                      'pandas',
+                      'joblib',
+                      'cython',
+                      'scikit-learn',
+                      # 'rdkit',
+                      'h5py',
+                      'ntplib',
+                      'argh'],
+    tests_require=['pytest', 'pytest-cov', 'pytest-pep8'],
+    classifiers=[
+        'Intended Audience :: Science/Research',
+        'Intended Audience :: Developers',
+        'Topic :: Software Development',
+        'Topic :: Scientific/Engineering',
+        'License :: OSI Approved',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6'],
 )
