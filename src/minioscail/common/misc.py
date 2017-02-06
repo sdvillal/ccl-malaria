@@ -16,7 +16,6 @@ import itertools
 import urllib
 import numpy as np
 from scipy.stats import nanmedian
-from minioscail.integration.thirdparty import ntplib
 
 
 def download(url, dest, overwrite=False, info=lambda msg: None):
@@ -29,7 +28,6 @@ def download(url, dest, overwrite=False, info=lambda msg: None):
 
 
 def home():
-    #What is the equivalent of user.home in python 3?
     return op.expanduser('~')
 
 
@@ -289,6 +287,10 @@ def internet_time(ntpservers=('ntp-0.imp.univie.ac.at', 'europe.pool.ntp.org')):
     Returns a string like "Thu, 13 Mar 2014 11:35:41 UTC"
     """
     # Maybe also parse from, e.g., the webpage of the time service of the U.S. army
+    try:
+        import ntplib
+    except ImportError:
+        from minioscail.integration.thirdparty import ntplib
     try:
         for server in ntpservers:
             response = ntplib.NTPClient().request(server, version=3)
