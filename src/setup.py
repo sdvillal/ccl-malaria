@@ -12,6 +12,11 @@ setup(
     author='Santi Villalba, Floriane Montanari',
     author_email='sdvillal@gmail.com',
     description='Entry for the TDT Malaria 2014 Challenge',
+    entry_points={
+        'console_scripts': [
+            'ccl-malaria = ccl_malaria.cli:main',
+        ]
+    },
     install_requires=['future',
                       'numpy',
                       'scipy',
