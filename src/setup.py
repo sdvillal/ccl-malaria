@@ -24,10 +24,12 @@ setup(
                       'joblib',
                       'cython',
                       'scikit-learn',
-                      # 'rdkit',
                       'h5py',
                       'ntplib',
-                      'argh'],
+                      'argh',
+                      # Not in pypi
+                      # 'rdkit',
+                      ],
     tests_require=['pytest', 'pytest-cov', 'pytest-pep8'],
     classifiers=[
         'Intended Audience :: Science/Research',
