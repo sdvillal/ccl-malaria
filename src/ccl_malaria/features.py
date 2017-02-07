@@ -7,7 +7,7 @@ from glob import glob
 from operator import itemgetter
 import os.path as op
 from collections import defaultdict
-from itertools import islice, izip, product, chain
+from itertools import islice, product, chain
 import gzip
 import os
 
@@ -405,7 +405,7 @@ def munge_ecfps():
             count = int(vals[1])
             if len(vals) > 2:
                 a = iter(vals[2:])
-                centers = [(center, radius) for center, radius in izip(a, a)]
+                centers = [(center, radius) for center, radius in zip(a, a)]
                 return cansmi, count, centers
             return cansmi, count, ()
         values = line.strip().split('\t')
@@ -445,7 +445,7 @@ def munge_ecfps():
             index = self.molid2i.get(self.data2molid(moldata), None)
             if index is None:
                 return
-            goes_to = index / self.chunksize
+            goes_to = int(index / self.chunksize)
             self.temp_files[goes_to].write(moldata)
             if not moldata.endswith('\n'):
                 self.temp_files[goes_to].write('\n')
@@ -495,7 +495,7 @@ def munge_ecfps():
         with open(op.join(_MALARIA_ECFPS_DIR, dset)) as reader, \
                 open(op.join(_MALARIA_ECFPS_DIR, dset + '.merged'), 'w') as writer:
             for ecfp in reader:
-                fcfp = reader.next()
+                fcfp = next(reader)
                 molide, subse = parse_weirdfpformat_line(ecfp)
                 molidf, subsf = parse_weirdfpformat_line(fcfp)
                 assert molide == molidf
@@ -949,7 +949,7 @@ class MurmurFolder(Configurable):
             substructures = (substructures,)
         features = self.hash(substructures) % self.fold_size
         if self._save_map:
-            for feature, key in izip(features, substructures):
+            for feature, key in zip(features, substructures):
                 self._features[feature].add(key)
         return features
 
