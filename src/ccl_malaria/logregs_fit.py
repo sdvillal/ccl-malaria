@@ -1,5 +1,6 @@
 # coding=utf-8
 """Experiments with Morgan fingerprints and logistic regression (sklearn and vowpal wabbit)."""
+from __future__ import print_function, division
 from collections import OrderedDict
 from copy import copy
 import hashlib
@@ -13,7 +14,7 @@ import h5py
 import joblib
 from sklearn.base import clone
 from sklearn.linear_model.logistic import LogisticRegression
-from sklearn.metrics.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score
 import numpy as np
 
 from ccl_malaria import MALARIA_EXPS_ROOT, info
@@ -69,13 +70,13 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
                 fingerprint_fold_size=1023,
                 # Computational requirements params
                 force=False,
-                chunksize=1000000):
+                chunksize=1000000,
+                max_logreg_tol=1E-5):
     """Logistic regression experiment using the liblinear wrapper in sklearn.
     Generates cross-val results
     """
 
-    ### TODO Remove
-    if logreg_tol < 1E-5:
+    if max_logreg_tol is not None and logreg_tol < max_logreg_tol:
         info('Ignoring long intolerant experiments')
         return
 
@@ -95,10 +96,10 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
     folder = None if fingerprint_fold_size < 1 else MurmurFolder(seed=fingerprint_folder_seed,
                                                                  fold_size=fingerprint_fold_size)
     rf_lab, rf_amb, rf_unl, rf_scr = malaria_logreg_fpt_providers(folder)
-    info('Data description: %s' % rf_lab.who().id(nonids_too=True))
+    info('Data description: %s' % rf_lab.configuration().id(nonids_too=True))
 
     # Experiment context: data
-    data_id = rf_lab.who().id(nonids_too=True)
+    data_id = rf_lab.configuration().id(nonids_too=True)
     data_dir = op.join(dest_dir, data_id)
     ensure_dir(data_dir)
 
@@ -122,7 +123,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
             ('random_state', my_rng.randint(low=0, high=1000 ** 4)),
         ))
         model_setup = LogisticRegression(**logreg_params)
-        model_id = 'skllogreg__%s' % '__'.join(['%s=%s' % (k, str(v)) for k, v in logreg_params.iteritems()])
+        model_id = 'skllogreg__%s' % '__'.join(['%s=%s' % (k, str(v)) for k, v in logreg_params.items()])
         model_dir = op.join(data_dir, model_id)
         ensure_dir(model_dir)
         info('Model: %s' % model_id)
@@ -142,9 +143,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
         # Anytime we see this file, we know we need to stop
         stop_computing_file = op.join(eval_dir, 'STOP_BAD_FOLD')
 
-        #---------
-        #--------- Time to work!
-        #---------
+        # --- Time to work!
 
         # Save model config
         joblib.dump(model_setup, op.join(model_dir, 'model_setup.pkl'), compress=3)
@@ -185,7 +184,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
                          stratify=True)
 
         # Fit and classify
-        for cv_fold_num in xrange(num_cv_folds):
+        for cv_fold_num in range(num_cv_folds):
 
             fold_info_file = op.join(eval_dir, 'fold=%d__info.json' % cv_fold_num)
             if op.isfile(fold_info_file):
@@ -398,7 +397,7 @@ def cl():
            fingerprint_fold_sizes=(0,),
            fingerprint_folder_seeds=(0,))
 
-    #----- Save the cls to files
+    # ---- Save the cls to files
 
     all_commands = list(set(all_commands))    # Remove duplicates
 
@@ -421,11 +420,11 @@ def cl():
         with open(op.join(op.dirname(__file__), '..', name), 'w') as writer:
             writer.write('\n'.join(cls))
 
-    #----- Summary
+    # Summary
     total_cls = sum(len(cl) for _, cl, _ in destinies)
-    print 'Total number of commands: %d' % total_cls
+    print('Total number of commands: %d' % total_cls)
     for name, cls, p in destinies:
-        print '\t%s\t%d %g %g' % (name.ljust(30), len(cls), p, len(cls) / (total_cls + 1.))
+        print('\t%s\t%d %g %g' % (name.ljust(30), len(cls), p, len(cls) / (total_cls + 1.)))
 
 
 if __name__ == '__main__':
@@ -433,6 +432,6 @@ if __name__ == '__main__':
     parser.add_commands([cl, fit_logregs])
     parser.dispatch()
 
-    # TODO: bring back from oscail configurable to model (urgent!) and eval (unnecessary, but good for consistency)
-    # TODO: use SGDClassifier to be able to use elastic net
-    # TODO: vowpal wabbit back to scene - it was the original idea for the tutorial!
+# TODO: bring back from oscail configurable to model (urgent!) and eval (unnecessary, but good for consistency)
+# TODO: use SGDClassifier to be able to use elastic net
+# TODO: vowpal wabbit back to scene - it was the original idea for the tutorial!

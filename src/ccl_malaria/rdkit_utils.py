@@ -1,6 +1,7 @@
 # coding=utf-8
 """Molecule manipulation using rdkit."""
-from __future__ import print_function
+from __future__ import print_function, division
+from future.utils import string_types
 from collections import Iterable
 from rdkit import Chem
 from rdkit.Chem import Descriptors, AllChem
@@ -21,6 +22,7 @@ from collections import defaultdict
 
 def discover_rdk_descriptors(verbose=False):
     """Returns a list of the names descriptors (other than fps, ultrashape and possibly others) present in RDKIT."""
+    # noinspection PyProtectedMember
     descriptors = tuple([desc_name for desc_name, func in Descriptors._descList])
     if verbose:
         print('Discovered RDKIT descriptors...')
@@ -91,7 +93,7 @@ def explain_circular_substructure(mol,
 
 
 def unfolded_fingerprint(mol, max_radius=100, fcfp=False):
-    if isinstance(mol, basestring):
+    if isinstance(mol, string_types):
         mol = to_rdkit_mol(mol)  # TODO: check it is an rdkit mol otherwise
     fpsinfo = {}
     # N.B. We won't actually use rdkit hash, so we won't ask for nonzero values...

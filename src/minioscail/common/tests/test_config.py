@@ -5,6 +5,7 @@ from functools import partial
 import hashlib
 import inspect
 from time import strptime, mktime
+# noinspection PyProtectedMember
 from minioscail.common.config import parse_id_string, Configurable, Configuration, config_dict_for_object, \
     mlexp_info_helper, _dict_or_slotsdict, configuration_as_string
 import pytest
@@ -268,7 +269,7 @@ def test_configurable_builtins(c1):
 def test_configurable_anyobject(c1):
 
     # Objects without proper representation
-    class RandomClass():
+    class RandomClass(object):
         def __init__(self):
             self.param = 'yes'
     c1.p1 = RandomClass()

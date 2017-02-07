@@ -1,5 +1,6 @@
 # coding=utf-8
 """Some utilities for model evaluation."""
+from __future__ import print_function
 from itertools import combinations
 from math import ceil
 import numpy as np
@@ -14,6 +15,7 @@ except ImportError:
 # Evaluation metrics
 ###############################################
 
+# noinspection PyTypeChecker
 def enrichment_at(actual, scores, percentage=0.1, target=1, bigger_is_better=True):
     """Calculate the enrichment of the ranking induced by the given scores.
     Here enrichment is defined as percentage of actives recovered when screening a percentage of the compounds.
@@ -67,7 +69,7 @@ def kendalltau_all(scores, log=True):
         kt = kendalltau(a[1], b[1])
         kts[(a[0], b[0])] = kt
         if log:
-            print a[0], b[0], '%.4f' % kt
+            print(a[0], b[0], '%.4f' % kt)
     return kts
 
 ###############################################
@@ -101,9 +103,9 @@ def scores2rankings(X, smaller_score_ranks_higher=True, eps=1E-9):
         """Averages the rankings of scores that are considered the same."""
         i = 0
         while i < len(x):  # Terrible looking loop, check efficiency...
-            #Find out how many group under this score...
+            # Find out how many group under this score...
             group_size = 1
-            for j in xrange(i + 1, len(x)):
+            for j in range(i + 1, len(x)):
                 if abs(x[order[j]] - x[order[j-1]]) < eps:  # N.B. we *do chain*
                                                             # (i.e., two elements in a group can be farther
                                                             # than eps away as long as there is a "sequence"
@@ -111,11 +113,11 @@ def scores2rankings(X, smaller_score_ranks_higher=True, eps=1E-9):
                     group_size += 1
                 else:
                     break
-            #Re-rank according to the mean rank for all the group
+            # Re-rank according to the mean rank for all the group
             base_rank = ranks[order[i]]
             ranksum = (group_size * base_rank + (group_size * (group_size - 1) / 2.))
             rankmean = ranksum / group_size
-            for j in xrange(i, i + group_size):
+            for j in range(i, i + group_size):
                 ranks[order[j]] = rankmean
             i += group_size
         return ranks
@@ -131,14 +133,14 @@ def scores2rankings(X, smaller_score_ranks_higher=True, eps=1E-9):
         sorted_indices = np.argsort(x if smaller_score_ranks_higher else -x).astype(np.uint32)
         ranks = np.empty(len(x))
         ranks[sorted_indices] = np.arange(len(x))
-        #Solve ties...
+        # Solve ties...
         return solve_ties(x, sorted_indices, ranks)
 
     if len(X.shape) == 1:
         return s2r(X).astype(np.int)
     else:
         # Probably we could use argsort axis here too, but lets go for loop ATM
-        ranks = [s2r(X[:, col]) for col in xrange(X.shape[1])]
+        ranks = [s2r(X[:, col]) for col in range(X.shape[1])]
         return np.array(ranks).T
 
 

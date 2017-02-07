@@ -78,6 +78,7 @@ def clean_results_pre_infojson_bug_fix():
 #################
 
 
+# noinspection PyUnresolvedReferences
 def logreg_deploy(dest_file=MALARIA_LOGREGS_DEPLOYMENT_H5):
     """Generates predictions for unlabelled datasets."""
 
@@ -116,12 +117,7 @@ def logreg_deploy(dest_file=MALARIA_LOGREGS_DEPLOYMENT_H5):
     rf_lab, rf_amb, rf_unl, rf_scr = malaria_logreg_fpt_providers(None)
 
     for i, res in enumerate(deployers.result):
-        f_name = '%s__%s' % (res.model_setup_id(), res.eval_setup_id())  # What about the data setup?
-                                                                         # Here it works but in general not
-                                                                         # Save it all...
-                                                                         # (a new dataset with all the coords
-                                                                         # and the result path)
-        print f_name
+        f_name = '%s__%s' % (res.model_setup_id(), res.eval_setup_id())
 
         # Lab
         if '%s/lab' % f_name not in h5:
@@ -160,11 +156,11 @@ def logreg_molids(dset='lab'):
     # No need to do this on a per-result basis because
     # atm we are warranted that they are the same accross all evaluations.
     rf_lab, rf_amb, rf_unl, rf_scr = malaria_logreg_fpt_providers(None)
-    rf = rf_lab if dset == 'lab' else \
-         rf_amb if dset == 'amb' else \
-         rf_unl if dset == 'unl' else \
-         rf_scr if dset == 'scr' else \
-         None
+    rf = (rf_lab if dset == 'lab' else
+          rf_amb if dset == 'amb' else
+          rf_unl if dset == 'unl' else
+          rf_scr if dset == 'scr' else
+          None)
     if rf is None:
         raise Exception('Unknown dataset %s' % dset)
     return rf.ids()

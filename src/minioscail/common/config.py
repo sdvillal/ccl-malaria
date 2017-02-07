@@ -1,5 +1,7 @@
 # coding=utf-8
 """An attempt to abstract configurability and experiment identifiability in a convenient way."""
+from __future__ import print_function
+from future.utils import string_types
 import datetime
 import hashlib
 import inspect
@@ -66,9 +68,9 @@ class Configuration(object):
         # Synonyms to allow more concise representations
         self._synonyms = {}
         if synonyms is not None:
-            for longname, shortname in synonyms.iteritems():
+            for longname, shortname in synonyms.items():
                 self.set_synonym(longname, shortname)
-        #Keys here won't make it to the configuration string unless explicitly asked for
+        # Keys here won't make it to the configuration string unless explicitly asked for
         if not non_id_keys:
             self.non_ids = set()
         elif is_iterable(non_id_keys):
@@ -118,9 +120,9 @@ class Configuration(object):
                "verbose=True" is a parameter of the nested configuration
           "min_split=10" is another property
         """
-        #Key-value list
+        # Key-value list
         def sort_kvs_fl():
-            kvs = self.configdict.iteritems()
+            kvs = self.configdict.items()
             if self._sort_by_key:
                 kvs = sorted(kvs)
             first_set = set(self._prefix_keys)
@@ -244,7 +246,7 @@ def config_dict_for_object(obj, add_descriptors=False):
     cd = _dict_or_slotsdict(obj)
     if add_descriptors:
         cd.update(_data_descriptors(obj))
-    return {k: v for k, v in cd.iteritems()
+    return {k: v for k, v in cd.items()
             if not k.startswith('_') and not k.endswith('_')}
 
 
@@ -305,7 +307,7 @@ def parse_id_string(id_string, parse_nested=True, infer_numbers=True, remove_quo
     infer_numbers : bool, [default=True]
         If True, parse floats and ints to be numbers; if False, strings are returned instead.
 
-    remove_remove_quotes : bool, [default=True]
+    remove_quotes : bool, [default=True]
         If True (and parse_nested is False), quotes are removed from values; otherwise quotes are kept.
 
     Returns
@@ -315,11 +317,11 @@ def parse_id_string(id_string, parse_nested=True, infer_numbers=True, remove_quo
     Examples
     --------
     >>> (name, config) = parse_id_string('rfc#n_jobs="multiple#here=100"')
-    >>> print name
+    >>> print(name)
     rfc
-    >>> print len(config)
+    >>> print(len(config))
     1
-    >>> print config['n_jobs']
+    >>> print(config['n_jobs'])
     ('multiple', {'here': 100})
     """
     # Auxiliary functions
@@ -373,7 +375,7 @@ def configuration_as_string(obj):
     """
     if obj is None:
         return None
-    if isinstance(obj, basestring):
+    if isinstance(obj, string_types):
         return obj
     try:
         return obj.id()

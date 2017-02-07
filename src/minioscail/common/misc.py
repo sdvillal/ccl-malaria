@@ -1,5 +1,8 @@
 # coding=utf-8
 """A jumble of seemingly useful stuff."""
+from __future__ import division, print_function
+from future.utils import string_types
+from future.builtins import str as text
 import collections
 import datetime
 import os
@@ -11,11 +14,13 @@ import re
 import shutil
 import unicodedata
 import os.path as op
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import itertools
 import urllib
 import numpy as np
-from scipy.stats import nanmedian
 
 
 def download(url, dest, overwrite=False, info=lambda msg: None):
@@ -33,20 +38,26 @@ def home():
 
 def ensure_writable_dir(path):
     """Ensures that a path is a writable directory."""
-    if op.exists(path):
+    def check_path(path):
         if not op.isdir(path):
             raise Exception('%s exists but it is not a directory' % path)
         if not os.access(path, os.W_OK):
             raise Exception('%s is a directory but it is not writable' % path)
+    if op.exists(path):
+        check_path(path)
     else:
         try:
             os.makedirs(path)
-        except:
-            print 'Somebody else created the shit?'
+        except Exception:
+            if op.exists(path):  # Simpler than using a file lock to work on multithreading...
+                check_path(path)
+            else:
+                raise
+    return path
 
 
-def ensure_dir(path):
-    ensure_writable_dir(path)
+def ensure_dir(path0, *parts):
+    return ensure_writable_dir(op.join(path0, *parts))
 
 
 def make_temp_dir():
@@ -59,11 +70,9 @@ def make_temp_dir():
     return tempdir
 
 
-def move_directories_with(
-        root=op.join(op.expanduser('~'), '--kaggle', 'amazonsec', 'data', 'experiments', 'collected'),
-        dest=op.join(op.expanduser('~'), '--kaggle', 'amazonsec', 'data', 'experiments', '__quarantine__', 'badfolds'),
-        to_move=lambda dirpath, dirnames, filenames: 'BAD_FOLD_BAN.json' in filenames,
-        symlink=False):
+def move_directories_with(root, dest,
+                          to_move=lambda dirpath, dirnames, filenames: 'BAD_FOLD_BAN.json' in filenames,
+                          symlink=False):
 
     def path2list(path):
         head, tail = op.split(path)
@@ -86,16 +95,16 @@ def move_directories_with(
 
     for dirpath, dirnames, filenames in os.walk(root):
         if to_move(dirpath, dirnames, filenames):
-            #1- recreate hierarchy
+            # 1- recreate hierarchy
             dirpath_list = path2list(dirpath)
             dest_root = op.join(dest, *dirpath_list[len(root_list):-1])
             ensure_writable_dir(dest_root)
             if symlink:
                 os.symlink(op.realpath(dirpath), op.realpath(dest_root))
             else:
-                #2- move directory
+                # 2- move directory
                 shutil.move(dirpath, dest_root)
-                #3- cleanup empty dirs
+                # 3- cleanup empty dirs
                 bottom_up_remove_empty_dirs(op.dirname(dirpath))
 
 
@@ -110,10 +119,10 @@ def slugify(value, max_filename_length=200):
       - http://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename-in-python
     See too: http://en.wikipedia.org/wiki/Comparison_of_file_systems#Limits.
     """
-    value = unicode(value)
+    value = text(value)
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
-    value = unicode(re.sub('[^\w\s-]', '', value).strip().lower())
-    value = unicode(re.sub('[-\s]+', '-', value))
+    value = text(re.sub('[^\w\s-]', '', value).strip().lower())
+    value = text(re.sub('[-\s]+', '-', value))
     if max_filename_length is not None and len(value) > max_filename_length:
         return value[:max_filename_length]
     return value
@@ -125,21 +134,17 @@ class memoized(object):
     (not reevaluated).
     """
     def __init__(self, func):
-        print 'Memo'
         self.func = func
         self.cache = {}
 
     def __call__(self, *args):
-        print 'MemoCall'
         try:
             return self.cache[args]
         except KeyError:
-            print 'Not memoized yet'
             value = self.func(*args)
             self.cache[args] = value
             return value
         except TypeError:
-            print 'MemoCall uncacheable'
             # uncachable -- for instance, passing a list as an argument.
             # Better to not cache than to blow up entirely.
             return self.func(*args)
@@ -179,7 +184,7 @@ def unpickle_or_none(path):
     try:
         with open(path) as reader:
             return pickle.load(reader)
-    except Exception, _:
+    except Exception:  # too broad
         return None
 
 
@@ -223,7 +228,7 @@ def partial2call(p, positional=None, keywords=None):
         defaults = [] if not defaults else defaults
         args = [] if not args else args
         args_set = set(args)
-        #Check that everything is fine...
+        # Check that everything is fine...
         keywords = dict(zip(args[-len(defaults):], defaults) + keywords.items())  # N.B. order matters
         keywords_set = set(keywords.keys())
         if len(keywords_set - args_set) > 0:
@@ -240,9 +245,7 @@ def partial2call(p, positional=None, keywords=None):
     raise Exception('Only partials and functions are allowed, %r is none of them' % p)
 
 
-###########
-########### Iterables flatten
-###########
+# --- Iterables flatten
 
 def flatten(iterables):
     """Flattens an iterable of iterables, returning a generator."""
@@ -256,7 +259,7 @@ def lflatten(iterables):
 
 def flatten_multi(iterable):
     for element in iterable:
-        if isinstance(element, collections.Iterable) and not isinstance(element, basestring):
+        if isinstance(element, collections.Iterable) and not isinstance(element, string_types):
             for sub in flatten_multi(element):
                 yield sub
         else:
@@ -278,7 +281,7 @@ def is_iterable(v):
 
 def fill_missing_scores(scores):
     scores2 = scores.copy()
-    scores2[~np.isfinite(scores2)] = nanmedian(scores2)
+    scores2[~np.isfinite(scores2)] = np.nanmedian(scores2)
     return scores2
 
 
@@ -287,10 +290,7 @@ def internet_time(ntpservers=('ntp-0.imp.univie.ac.at', 'europe.pool.ntp.org')):
     Returns a string like "Thu, 13 Mar 2014 11:35:41 UTC"
     """
     # Maybe also parse from, e.g., the webpage of the time service of the U.S. army
-    try:
-        import ntplib
-    except ImportError:
-        from minioscail.integration.thirdparty import ntplib
+    import ntplib
     try:
         for server in ntpservers:
             response = ntplib.NTPClient().request(server, version=3)

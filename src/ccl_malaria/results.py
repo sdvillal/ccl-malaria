@@ -467,10 +467,12 @@ def final_merged_submissions(calibrate=False,
     stacker = LinearRegression()
     stacker.fit(lab[['trees', 'logregs']], lab['labels'])
 
+    # noinspection PyArgumentList
     submission_unl_st = Series(data=stacker.predict(unl[['trees', 'logregs']]), index=unl.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-unl.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
     save_submission(submission_unl_st, outfile, select_top=None)
 
+    # noinspection PyArgumentList
     submission_scr_st = Series(data=stacker.predict(scr[['trees', 'logregs']]), index=scr.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-scr.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
     save_submission(submission_scr_st, outfile, select_top=select_top_scr)

@@ -1,5 +1,7 @@
 # coding=utf-8
 """Feature generation and munging."""
+from __future__ import print_function, division
+from future.utils import string_types
 from array import array
 from glob import glob
 from operator import itemgetter
@@ -190,13 +192,14 @@ def rdkfs(start=0, step=46, mols='all', output_file=None):
     better called as:
     rdkfs --start 0 --step 1 --mols scr --output-file ~/scr-rdkfs.h5
     """
-    if isinstance(mols, basestring):
+    if isinstance(mols, string_types):
         mols = MOLS2MOLS[mols]()
     _molidsmiles_it(start=start, step=step,
                     mols=mols,
                     processor=_rdkfeats_writer(output_file))
 
 
+# noinspection PyAbstractClass
 class MalariaRDKFsExampleSet(ExampleSet):
 
     def __init__(self, dset='lab', remove_ambiguous=True, remove_with_nan=True, streaming_in_ram=False):
@@ -268,14 +271,14 @@ class MalariaRDKFsExampleSet(ExampleSet):
 
     def X_stream(self, chunksize=10000):
         if self._streaming_in_ram or self.dset == 'lab' or self.dset == 'amb':  # Dodgy lab and amb, remove corner case
-            for start in xrange(0, self.ne_stream(), chunksize):
+            for start in range(0, self.ne_stream(), chunksize):
                 yield self.X()[start:start+chunksize]
         else:
             h5 = h5py.File(self._h5)['rdkdescs']
-            for start in xrange(0, self.ne_stream(), chunksize):
-                yield h5[start:start+chunksize]  # FIXME: bug, do not skip some of the molecules
-                                                 # that need to be skipped remove ambiguous and
-                                                 # guys with nans, it is simple
+            for start in range(0, self.ne_stream(), chunksize):
+                yield h5[start:start+chunksize]
+                # FIXME: bug, do not skip some of the molecules that need to be skipped,
+                # remove ambiguous and nans
             h5.close()
 
 
@@ -329,9 +332,9 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=Fal
                 features_strings = ['%s %d %s' % (cansmiles,
                                                   count,
                                                   ' '.join(['%d %d' % (c, r) for c, r in centers[cansmiles]]))
-                                    for cansmiles, count in counts.iteritems()]
+                                    for cansmiles, count in counts.items()]
             else:
-                features_strings = ['%s %d' % (cansmiles, count) for cansmiles, count in counts.iteritems()]
+                features_strings = ['%s %d' % (cansmiles, count) for cansmiles, count in counts.items()]
             writer.write('%s\t%s\n' % (molid, '\t'.join(features_strings)))
         except:
             info('Failed molecule %s: %s' % (molid, smiles))
@@ -350,7 +353,7 @@ def ecfps(start=0, step=46, mols='lab', output_file=None, fcfp=True):
       - output_file: the file to which the fingerprints will be written, in
                      weird fp format(TM).
     """
-    if isinstance(mols, basestring):
+    if isinstance(mols, string_types):
         mols = MOLS2MOLS[mols]()
     ensure_dir(op.dirname(output_file))
     _molidsmiles_it(start=start, step=step,
@@ -389,10 +392,10 @@ def ecfps_mp(numjobs=None, dest_dir=None):
 
 def munge_ecfps():
 
-    #####---Step 1: put all these together in 3 files, lab, unl and scr.
-    #####     - ECFPs and FCFPs for the same mol are together
-    #####     - The order is the same as in the original file
-    #####     - Optionally delete the workers files
+    # ---Step 1: put all these together in 3 files, lab, unl and scr.
+    #       - ECFPs and FCFPs for the same mol are together
+    #       - The order is the same as in the original file
+    #       - Optionally delete the workers files
 
     def parse_weirdfpformat_line(line):
         """Returns a tuple (molid, [cansmi, count, [(center, radius)]+]+)."""
@@ -431,7 +434,7 @@ def munge_ecfps():
             self.chunksize = chunksize
             self.molid2i = molid2i
             self.num_mols = len(self.molid2i)
-            self.temp_fns = [op.join(root, '%s-%d' % (prefix, base)) for base in xrange(0, self.num_mols, chunksize)]
+            self.temp_fns = [op.join(root, '%s-%d' % (prefix, base)) for base in range(0, self.num_mols, chunksize)]
             self.temp_files = [open(fn, 'w') for fn in self.temp_fns]
             self.data2molid = data2molid
             self.root = root
@@ -482,10 +485,10 @@ def munge_ecfps():
 
     _process_molecule_data(malaria_ecfp_parallel_results_iterator(), (labproc, unlproc, scrproc))
 
-    #####---Step 2: recode ECFPs and FCFPs from the file at step 1. After this:
-    #####  - ECFPs and FCFPs duplicates get merged.
-    #####  - A unique assignment for each substructure in the dataset to a int [0, ...] (column number).
-    #####  - A unique assignment for each molid in the dataset for wich Morgan DID NOT FAIL (row number).
+    # ---Step 2: recode ECFPs and FCFPs from the file at step 1. After this:
+    #  - ECFPs and FCFPs duplicates get merged.
+    #  - A unique assignment for each substructure in the dataset to a int [0, ...] (column number).
+    #  - A unique assignment for each molid in the dataset for wich Morgan DID NOT FAIL (row number).
 
     def ecfps_recode(dset='lab'):
         """Merges ECFPs and FCFPs into a single line and gets rid of the centers information if present."""
@@ -556,9 +559,9 @@ def munge_ecfps():
     mol2i('unl')
     mol2i('scr')
 
-    #####---Step 3: write sparse matrices with the recoded information of step 2. After this:
-    #####  - We get a h5 file for each dataset, with a sparse matrix in CSR format.
-    #####  - Note that this is a memory intense procedure, can be done lightweight by using 2 passes.
+    # ---Step 3: write sparse matrices with the recoded information of step 2. After this:
+    #      - We get a h5 file for each dataset, with a sparse matrix in CSR format.
+    #      - Note that this is a memory intense procedure, can be done lightweight by using 2 passes.
 
     def to_sparse_chihuahua(dset='lab', two_pass=False):
         """Generates sparse CSR matrices using as features only these in the labelled dataset,
@@ -609,11 +612,12 @@ def munge_ecfps():
     to_sparse_chihuahua('unl')
     to_sparse_chihuahua('scr')
 
-    #####---Step 4: lame feature duplicate detection to tackle partially multicolliniarity
+    # --- Step 4: lame feature duplicate detection to tackle partially multicolliniarity
     MalariaFingerprintsManager(zero_dupes='lab').X()
     MalariaFingerprintsManager(zero_dupes='all').X()
 
 
+# noinspection PyNoneFunctionAssignment
 def detect_duplicate_features(transductive=False, verbose=False):
     """Detect exact duplicated features in the malaria dataset, returning a list of duplicated groups (column indices).
     Here duplicated is very practically defined as "appearing in the same molecules accross the malaria dataset".
@@ -639,7 +643,7 @@ def detect_duplicate_features(transductive=False, verbose=False):
     X = X.tocsc()
     X.indices.flags.writeable = False  # Make the views from this array hashable
     groups = defaultdict(lambda: array('I'))
-    for i in xrange(nf):
+    for i in range(nf):
         xi = X.indices[X.indptr[i]:X.indptr[i+1]:]
         groups[xi.data].append(i)
         if verbose and i > 0 and not i % 1000000:
@@ -701,7 +705,7 @@ class MalariaFingerprintsManager(object):
         self._streaming_from_ram = streaming_from_ram
         if not self._only_labelled:
             raise NotImplementedError
-        if zero_dupes and not zero_dupes in {'all', 'lab'}:
+        if zero_dupes and zero_dupes not in {'all', 'lab'}:
             raise Exception('Zero dupes in lab must be one of {None, all, lab}, but %r' % zero_dupes)
         # Something in {None|lab|all} (recommended all)
         self._zero_dupes = zero_dupes
@@ -771,7 +775,7 @@ class MalariaFingerprintsManager(object):
 
     def mols_with_feature(self, bit_or_smiles):
         """Returns a list with the molids of the molecules that contains one feature."""
-        column = self.s2i(bit_or_smiles) if isinstance(bit_or_smiles, basestring) else bit_or_smiles
+        column = self.s2i(bit_or_smiles) if isinstance(bit_or_smiles, string_types) else bit_or_smiles
         molindices = self.XCSC().indices[self.XCSC().indptr[column]:self.XCSC().indptr[column+1]]
         return [self.i2m(index) for index in molindices]
 
@@ -781,6 +785,7 @@ class MalariaFingerprintsManager(object):
         #     with open(self._m2i_file) as reader:
         #         self._m2i = {m.rstrip(): i for i, m in enumerate(reader)}
         if self._m2i is None:
+            # noinspection PyTypeChecker
             self._m2i = {molid: i for i, molid in enumerate(self.molids())}
         return self._m2i.get(molid, None)
 
@@ -823,10 +828,9 @@ class MalariaFingerprintsManager(object):
             with h5py.File(self._sparse_file, 'r') as h5:
                 indices = h5['indices'][:]
                 indptr = h5['indptr'][:]
-                data = np.ones(len(indices), dtype=np.int8) if self._only01 else h5['data'][:]  # bools are ints in np
-                                                                                          # smallest datatype is int8
-                                                                                          # TODO implicit sparse 1/0
-                                                                                          # (ala oscail-java)
+                data = np.ones(len(indices), dtype=np.int8) if self._only01 else h5['data'][:]
+                # bools are ints in np, smallest datatype is int8
+                # TODO implicit sparse 1/0 (ala oscail-java)
                 shape = h5['shape'][:]
                 self._XCSR = csr_matrix((data, indices, indptr), shape=shape)
                 if self.dset == 'amb':
@@ -837,6 +841,7 @@ class MalariaFingerprintsManager(object):
                 # Dirty trick to remove duplicates without changing the map {col->structure)
                 if self._zero_dupes:
                     transductive = self._zero_dupes == 'all'
+                    # noinspection PyTypeChecker
                     self._XCSR = zero_columns(self._XCSR,
                                               self.duplicate_features_representatives(transductive=transductive)[0],
                                               zero_other=True)
@@ -851,7 +856,7 @@ class MalariaFingerprintsManager(object):
 
     def X_stream(self, chunksize=10000):
         if self._streaming_from_ram or self.dset == 'lab' or self.dset == 'amb':
-            for start in xrange(0, self.ne_stream(), chunksize):
+            for start in range(0, self.ne_stream(), chunksize):
                 yield self.X()[start:start+chunksize, :]
                 # Warn in the docstring that lab and amb will in any case still require all in ram
                 # Better, implement streaming in this case properly,
@@ -869,7 +874,7 @@ class MalariaFingerprintsManager(object):
                 columns_to_zero = np.ones(shape[1])
                 columns_to_zero[not_to_zero] = 0
                 columns_to_zero = np.where(columns_to_zero)[0]
-            for start in xrange(0, self.ne_stream(), chunksize):
+            for start in range(0, self.ne_stream(), chunksize):
                 chunk_ptrs = indptr[start:start+chunksize+1]
                 chunk_indices = indices[chunk_ptrs[0]:chunk_ptrs[-1]]
                 chunk_data = data[chunk_ptrs[0]:chunk_ptrs[-1]] if not self._only01 \
@@ -905,10 +910,10 @@ def fold_csr(X, folder, slow=False):
     # But then the indices for each row can be non-unique and non-sorted
     # Let's do a lot of work here...
     if slow:
-        cols = [np.unique(folder.assign_feature(X[row, :].indices)) for row in xrange(X.shape[0])]  # Fold
+        cols = [np.unique(folder.assign_feature(X[row, :].indices)) for row in range(X.shape[0])]  # Fold
     else:
         cols = []
-        for row in xrange(X.shape[0]):
+        for row in range(X.shape[0]):
             indices = X.indices[X.indptr[row]:X.indptr[row + 1]]
             cols.append(np.unique(folder.assign_feature(indices)))
 
@@ -917,6 +922,7 @@ def fold_csr(X, folder, slow=False):
         rows.fill(row_num)
         return rows
     rows = np.hstack([rowindices(i, len(c)) for i, c in enumerate(cols)])
+    # noinspection PyTypeChecker
     data = np.ones(len(rows), dtype=np.float)  # dtype=np.bool
     return coo_matrix((data, (rows, np.hstack(cols))), shape=(X.shape[0], folder.fold_size)).tocsr()
 
@@ -957,10 +963,11 @@ class MurmurFolder(Configurable):
         """Return a numpy array with bucket assignments for each original feature.
         That is csfold()[4] gives the fold for unfolded feature 4.
         """
-        max_unfolded_feature = max(max(group) for group in self._features.itervalues())
+        max_unfolded_feature = max(max(group) for group in self._features.values())
+        # noinspection PyTypeChecker
         fold2unfold = np.empty(max_unfolded_feature + 1, dtype=np.int32)
         fold2unfold.fill(-1)
-        for folded_feature, group in self._features.iteritems():
+        for folded_feature, group in self._features.items():
             fold2unfold[list(group)] = folded_feature
         return fold2unfold
 
@@ -968,6 +975,7 @@ class MurmurFolder(Configurable):
         self._features = defaultdict(set)
 
 
+# noinspection PyAbstractClass
 class MalariaFingerprintsExampleSet(ExampleSet):
     # TODO: consider merge this with MalariaFingerprintsManager
 
@@ -1037,17 +1045,17 @@ def cl(step=46, for_what='rdkf'):
             runid = 'fcfp=%r__start=%d__step=%d' % (fcfp, start, step)
             destfile = '~/tdtmalaria/data/rdkit/ecfps/from_workers/%s.weirdfps' % runid
             logfile = '~/tdtmalaria/data/rdkit/ecfps/from_workers/%s.log' % runid
-            print 'PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py ecfps ' \
-                  '--start %d --step %d --output-file %s %s &>%s' %\
-                  (start, step, destfile, '--fcfp' if fcfp else '', logfile)
+            print('PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py ecfps '
+                  '--start %d --step %d --output-file %s %s &>%s' %
+                  (start, step, destfile, '--fcfp' if fcfp else '', logfile))
     if for_what == 'rdkfs':
         for start, mols in product(starts, ('lab', 'unl', 'scr')):
             runid = 'rdkdescs__mols=%s__start=%d__step=%d' % (mols, start, step)
             destfile = '~/tdtmalaria/data/rdkit/rdkfs/from_workers/%s.h5' % runid
             logfile = '~/tdtmalaria/data/rdkit/rdkfs/from_workers/%s.log' % runid
-            print 'PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py rdkf ' \
-                  '--start %d --step %d --mols %s --output-file %s &>%s' %\
-                  (start, step, mols, destfile, logfile)
+            print('PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py rdkf '
+                  '--start %d --step %d --mols %s --output-file %s &>%s' %
+                  (start, step, mols, destfile, logfile))
 
 
 ##################################################

@@ -1,11 +1,11 @@
 # coding=utf-8
 """Analysis/plots and deployment of trees OOB results."""
-from copy import copy
 import os.path as op
+from copy import copy
 
 import h5py
-from pandas import DataFrame
 import numpy as np
+from pandas import DataFrame
 
 from ccl_malaria import info
 from ccl_malaria.features import MalariaRDKFsExampleSet
@@ -15,8 +15,8 @@ from ccl_malaria.trees_fit import MALARIA_TREES_EXPERIMENT_ROOT
 from minioscail.common.config import parse_id_string
 from minioscail.common.results import ResultInDisk
 
-
 MALARIA_TREES_DEPLOYMENT_H5 = op.join(MALARIA_TREES_EXPERIMENT_ROOT, 'trees-deployers.h5')
+
 
 #################
 # Results presented in a convenient way...
@@ -51,7 +51,7 @@ def trees_results_to_pandas(common_molids_cache=False):
     results_dict_of_dicts = {}
     for result in results:
         if common_molids_cache:
-            result.ids_cache = molids_cache    # dodgy, rework with a copying constructor
+            result.ids_cache = molids_cache  # dodgy, rework with a copying constructor
         rdict = copy(result.info())
         rdict['result'] = result
         # Some more ad-hoc keys for the model
@@ -94,16 +94,16 @@ def trees_deploy(dest_file=MALARIA_TREES_DEPLOYMENT_H5):
     h5 = h5py.File(dest_file, 'w')
 
     # Choose a few good results (maybe apply diversity filters or ensemble selection or...)
-    deployers = df[(df.model_num_trees == 6000)]
+    # noinspection PyUnresolvedReferences
+    deployers = df[(df['model_num_trees'] == 6000)]
 
     info('Deploying %d tree ensembles' % len(deployers))
 
     for i, res in enumerate(deployers.result):
-        f_name = '%s__%s' % (res.model_setup_id(), res.eval_setup_id())  # What about the data setup?
-                                                                         # Here it works but in general not
-                                                                         # Save it all...
-                                                                         # (a new dataset with all the coords
-                                                                         # and the result path)
+        f_name = '%s__%s' % (res.model_setup_id(), res.eval_setup_id())
+        # What about the data setup?
+        # Here it works but in general not
+        # Save it all (a new dataset with all the coords and the result path)
         info(f_name)
 
         # Lab
@@ -164,8 +164,8 @@ def do_trees_submissions(do_confirmatory=True,
 
 
 if __name__ == '__main__':
-
     import argh
+
     parser = argh.ArghParser()
     parser.add_commands([do_trees_submissions])
     parser.dispatch()

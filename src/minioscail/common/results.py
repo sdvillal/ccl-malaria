@@ -199,10 +199,6 @@ class OOBResult(ResultInDisk):
         with h5py.File(self._h5()) as h5:
             return h5['f_importances'][:]
 
-    ########
-    # The results here will be
-    ########
-
     def scores(self, dset):
         with h5py.File(self._h5()) as h5:
             return h5[dset][:]
