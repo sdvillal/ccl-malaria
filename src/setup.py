@@ -27,6 +27,7 @@ setup(
                       'h5py',
                       'ntplib',
                       'argh',
+                      'requests',
                       # Not in pypi
                       # 'rdkit',
                       ],
