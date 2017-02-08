@@ -23,25 +23,34 @@ from ccl_malaria.rdkit_utils import to_rdkit_mol
 def _labelled_smiles_file():
     return download('http://www.tdtproject.org/uploads/6/8/2/0/6820495/malariahts_trainingset.txt.gz',
                     op.join(MALARIA_ORIGINAL_DATA_ROOT, 'malariahts_trainingset.txt.gz'),
-                    info=info)
+                    info=info,
+                    sha256='0489de1a56415bbd162c26ec1e3546f92d24c15590779dc2261aec1ed86b62bb')
 
 
 def _unlabelled_smiles_file():
     return download('http://www.tdtproject.org/uploads/6/8/2/0/6820495/malariahts_externaltestset.txt',
                     op.join(MALARIA_ORIGINAL_DATA_ROOT, 'malariahts_externaltestset.txt'),
-                    info=info)
+                    info=info,
+                    sha256='90bad8d26b01e9ab209e66de111261b71249be9f26e42b0f6b53f9bb1327dd24')
 
 
 def _screening_smiles_file():
-    return download('http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz',
-                    op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.smi.gz'),
-                    info=info)
-
-
-def _malaria_screening_sdf_file():
-    return download('http://downloads.emolecules.com/ordersc/2014-01-01/parent.sdf.gz',
-                    op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.sdf.gz'),
-                    info=info)
+    #
+    # Original was:
+    #   http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz
+    # Current is:
+    #   http://downloads.emolecules.com/free/2017-02-01/version.smi.gz
+    # But of course, that is a different one... still, lets use it.
+    #
+    return download('http://downloads.emolecules.com/free/2017-02-01/version.smi.gz',
+                    op.join(MALARIA_ORIGINAL_DATA_ROOT, '20170202-emolecules.smi.gz'),
+                    info=info,
+                    sha256='9137110fbbfa10a60e5736db7670937ba6e92428d169b6fafd7d77ba6729401d')
+    # Could also upload good old 2014 version somewhere
+    # return download('http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz',
+    #                 op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.smi.gz'),
+    #                 info=info,
+    #                 sha256='d933c51f5a1542b1f89f006747d2ab65cda495709e0d7aaf5e115ae8ef785036')
 
 
 # ---Data in, relabelling
