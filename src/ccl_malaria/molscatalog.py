@@ -96,15 +96,18 @@ def read_labelled_smiles(relabel_func=relabel_pEC50):
     >>> print('Are there repeated ids in the labelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the labelled set? No.
     """
-    with gzip.open(_labelled_smiles_file()) as reader:
-        reader.next()  # Skip header
+    def _float_or_na(x):
+        return float(x) if not x == 'NA' else float('nan')
+
+    with gzip.open(_labelled_smiles_file(), 'rt') as reader:
+        next(reader)  # Skip header
         for line in reader:
             sample_id, Pf3D7_ps_green, Pf3D7_ps_red, Pf3D7_ps_hit, Pf3D7_pEC50, smiles = line.split()
             sample = (sample_id,
                       float(Pf3D7_ps_green),
                       float(Pf3D7_ps_red),
                       Pf3D7_ps_hit,  # true, false or ambiguous
-                      float(Pf3D7_pEC50) if Pf3D7_pEC50 != 'NA' else np.nan,   # can be NA or a float
+                      _float_or_na(Pf3D7_pEC50),  # can be NA or a float
                       smiles)
             yield relabel_func(sample)
 
@@ -112,8 +115,8 @@ def read_labelled_smiles(relabel_func=relabel_pEC50):
 def _count_label_changes(relabel_func=relabel_pEC50):
     """Returns information on the number of label changes induced by the relabelling function."""
     c = Counter()
-    for raw, rel in itertools.izip(read_labelled_smiles(lambda x: x),
-                                   read_labelled_smiles(relabel_func)):
+    for raw, rel in zip(read_labelled_smiles(lambda x: x),
+                        read_labelled_smiles(relabel_func)):
         class_raw = raw[3]
         class_rel = rel[3]
         c[class_raw + class_rel] += 1
@@ -144,8 +147,8 @@ def read_unlabelled_smiles():
     >>> print('Are there repeated ids in the unlabelled set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the unlabelled set? No.
     """
-    with open(_unlabelled_smiles_file()) as reader:
-        reader.next()  # Skip header
+    with open(_unlabelled_smiles_file(), 'rt') as reader:
+        next(reader)  # Skip header
         for line in reader:
             sample_id, smiles = line.split()
             yield (sample_id, smiles)
@@ -155,8 +158,10 @@ def read_screening_smiles():
     """Returns a generator [(molid, smiles)] of the purchasable molecules to screen for the competition.
     The original file contains a header:
       isosmiles parent_id
+    Newer files from emolecules contain
+      isosmiles version_id parent_id
 
-    For example:
+    For example, for the original (20140101) emolecules dataset:
     >>> generator = read_screening_smiles()
     >>> print(next(generator))
     ('10019', 'COC(=O)C12NCC3(C2(C)CCC3C1)C')
@@ -169,10 +174,11 @@ def read_screening_smiles():
     >>> print('Are there repeated ids in the screening set? %s.' % 'No' if len(ids) == num_molecules else 'Yes')
     Are there repeated ids in the screening set? No.
     """
-    with gzip.open(_screening_smiles_file()) as reader:
-        reader.next()  # Ignore header
+    with gzip.open(_screening_smiles_file(), 'rt') as reader:
+        next(reader)  # Ignore header
         for line in reader:
-            smiles, molid = line.split()
+            fields = line.split()
+            smiles, molid = fields[0], fields[-1]  # works for old and new version of the db
             yield (molid, smiles)
 
 
@@ -198,19 +204,19 @@ def molid_lab():
     """Returns a map {molid->label} for the labelled molecules."""
     cachefile = op.join(MALARIA_INDICES_ROOT, 'lab_molids_label.txt')
     if not op.isfile(cachefile):
-        with open(cachefile, 'w') as writer:
+        with open(cachefile, 'wt') as writer:
             writer.write('\n'.join(['%s %s' % (molid, label[0].lower())
                                     for molid, _, _, label, _, _ in read_labelled_smiles()]))
-    with open(cachefile) as reader:
+    with open(cachefile, 'rt') as reader:
         return {line.rstrip().split()[0]: line.rstrip().split()[1] for line in reader}
 
 
 def _molids_cache(molidit, cachefile):
     """Caches the molids in text files."""
     if not op.isfile(cachefile):
-        with open(cachefile, 'w') as writer:
+        with open(cachefile, 'wt') as writer:
             writer.write('\n'.join([molid for molid, _ in molidit]))
-    with open(cachefile) as reader:
+    with open(cachefile, 'rt') as reader:
         return [line.rstrip() for line in reader]
 
 
@@ -249,11 +255,12 @@ class MemMappedMols(object):
     #       http://stackoverflow.com/questions/20713063/writing-into-a-numpy-memmap-still-loads-into-ram-memory
     # TODO: make this a context manager
     # TODO: allow to do regular, no memmapped I/O with a "memmap" flag
+    # TODO: use jagged or do not use at all...
 
     def __init__(self, root_dir):
         """Quick random access to collections of molecules in disk, using molids.
         Caveat: great for random access, not suitable for streaming purposes.
-                All read molecules stay in memory until (all) handles to this memmap is closed.
+                All read molecules stay in memory until (all) handles to this memmap are closed.
         """
         # Where the index resides...
         self._root = root_dir
@@ -284,7 +291,7 @@ class MemMappedMols(object):
     def molids(self):
         """Returns the molids present in the catalog, sorted in the order they are written in the data file."""
         if self._molids is None:
-            with open(self._molids_file) as reader:
+            with open(self._molids_file, 'rt') as reader:
                 self._molids = [line.strip() for line in reader]
         return self._molids
 
@@ -312,7 +319,7 @@ class MemMappedMols(object):
 
     def mols(self, molids):
         """Returns a list of molecules (None for molecules not in the catalog) associated to the molids."""
-        return map(self.mol, molids)
+        return list(map(self.mol, molids))
 
     def close(self):
         """Close the open resourcer."""
@@ -323,7 +330,7 @@ class MemMappedMols(object):
         molids = []
         coords = []
         base = 0
-        with open(op.join(self._root, 'molsdata'), 'w') as writer:
+        with open(op.join(self._root, 'molsdata'), 'wb') as writer:
             for molid, smiles in it:
                 mol = to_rdkit_mol(smiles, molid=molid)
                 if mol is None:
@@ -335,7 +342,7 @@ class MemMappedMols(object):
                     coords.append((base, len(moldata)))
                     base += len(moldata)
                     writer.write(moldata)
-        with open(self._molids_file, 'w') as writer:
+        with open(self._molids_file, 'wt') as writer:
             for molid in molids:
                 writer.write(molid + '\n')
         np.save(self._coords_file, np.array(coords))
@@ -414,9 +421,10 @@ def build_benchmark_check_rdkmols_catalog(mmapdir, molit=read_labelled_only_smil
                 warning('Molecule %s with original smiles %s should not be parsed from the binary store' %
                         (molid, smiles))
         else:
-            if not Chem.MolToSmiles(emol) == Chem.MolToSmiles(mmms.mol(molid)):
-                warning('Molecule %s with original smiles %s do not reconstruct properly: \n\t(%s != %s)' %
-                        (molid, smiles, Chem.MolToSmiles(emol), Chem.MolToSmiles(mmms.mol(molid))))
+            if mmms.mol(molid) is not None:
+                if not Chem.MolToSmiles(emol) == Chem.MolToSmiles(mmms.mol(molid)):
+                    warning('Molecule %s with original smiles %s do not reconstruct properly: \n\t(%s != %s)' %
+                            (molid, smiles, Chem.MolToSmiles(emol), Chem.MolToSmiles(mmms.mol(molid))))
     info('All is OKish')
 
 
@@ -513,7 +521,7 @@ class MalariaCatalog(object):
         return self._m2pec50.get(molid, np.nan)
 
     def molids2pec50s(self, molids):
-        return map(self.molid2pec50, molids)
+        return list(map(self.molid2pec50, molids))
 
     def molid2smiles(self, molid):
         if self._m2smiles is None:
@@ -522,7 +530,7 @@ class MalariaCatalog(object):
         return self._m2smiles.get(molid, None)
 
     def molids2smiless(self, molids):
-        return map(self.molid2smiles, molids)
+        return list(map(self.molid2smiles, molids))
 
     def lab2i(self, molid):
         """Returns the index of a labelled molecule in the original file."""
@@ -615,7 +623,7 @@ class MalariaCatalog(object):
         """Returns a list of rdkit molecules (None also possible) for the molids."""
         if not is_iterable(molids):
             molids = (molids,)
-        return map(self.molid2mol, molids)
+        return list(map(self.molid2mol, molids))
 
 
 # --- Some pandas goodies
@@ -757,16 +765,18 @@ class PandasQueries(object):
         return df[~pd.isnull(df.pEC50)]
 
 
+def init(checks=False):
+    """Downloads the original files if necessary and builds the molecules catalogue."""
+    # Indices from molids
+    molid_lab()
+    lab_molids()
+    unl_molids()
+    scr_molids()
+    # Rdkit indices
+    catalog_malaria_mols(checks=checks)
+
+
 if __name__ == '__main__':
-    def init(checks=False):
-        """Downloads the original files if necessary and builds the molecules catalogue."""
-        # Indices from molids
-        molid_lab()
-        lab_molids()
-        unl_molids()
-        scr_molids()
-        # Rdkit indices
-        catalog_malaria_mols(checks=checks)
 
     def doctest():
         """Runs tests."""
