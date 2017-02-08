@@ -1,6 +1,10 @@
 # coding=utf-8
 """A jumble of seemingly useful stuff."""
 from __future__ import division, print_function
+
+import hashlib
+from contextlib import closing
+
 from future.utils import string_types
 from future.builtins import str as text
 import collections
@@ -19,15 +23,36 @@ try:
 except ImportError:
     import pickle
 import itertools
-import urllib
+import requests
 import numpy as np
 
 
-def download(url, dest, overwrite=False, info=lambda msg: None):
+def _download_file(url, dest):
+    with open(dest, 'wb') as writer, closing(requests.get(url, stream=True)) as r:
+        for chunk in r.iter_content(chunk_size=2048):
+            writer.write(chunk)
+    return dest
+
+
+def _sha256(fname):
+    sha256 = hashlib.sha256()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            sha256.update(chunk)
+    return sha256.hexdigest()
+
+
+def download(url, dest,
+             overwrite=False,
+             info=lambda msg: None,
+             sha256=None):
     """Downloads a file and returns the path to the downloaded file."""
     if not op.isfile(dest) or overwrite:
         info('\tDownloading:\n\t  %s\n\tinto:\n\t  %s' % (url, dest))
-        urllib.urlretrieve(url, dest)
+        dest = _download_file(url, dest)
+        if sha256 is not None:
+            if _sha256(dest) != sha256:
+                raise Exception('Downloaded file %r is corrupt' % dest)
         info('%s download succesful' % dest)
     return dest
 
