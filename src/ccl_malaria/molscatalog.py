@@ -40,17 +40,21 @@ def _screening_smiles_file():
     #   http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz
     # Current is:
     #   http://downloads.emolecules.com/free/2017-02-01/version.smi.gz
-    # But of course, that is a different one... still, lets use it.
+    # Current misses some molecules from the original, and has many new ones...
     #
-    return download('http://downloads.emolecules.com/free/2017-02-01/version.smi.gz',
-                    op.join(MALARIA_ORIGINAL_DATA_ROOT, '20170202-emolecules.smi.gz'),
-                    info=info,
-                    sha256='9137110fbbfa10a60e5736db7670937ba6e92428d169b6fafd7d77ba6729401d')
-    # Could also upload good old 2014 version somewhere
-    # return download('http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz',
-    #                 op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.smi.gz'),
-    #                 info=info,
-    #                 sha256='d933c51f5a1542b1f89f006747d2ab65cda495709e0d7aaf5e115ae8ef785036')
+
+    # Try first good old 2014 version (we should upload somewhere)
+    try:
+        return download('http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz',
+                        op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.smi.gz'),
+                        info=info,
+                        sha256='d933c51f5a1542b1f89f006747d2ab65cda495709e0d7aaf5e115ae8ef785036')
+    except:  # Too broad
+        # Of course, that is a different one... still, lets use it.
+        return download('http://downloads.emolecules.com/free/2017-02-01/version.smi.gz',
+                        op.join(MALARIA_ORIGINAL_DATA_ROOT, '20170202-emolecules.smi.gz'),
+                        info=info,
+                        sha256='9137110fbbfa10a60e5736db7670937ba6e92428d169b6fafd7d77ba6729401d')
 
 
 # ---Data in, relabelling
@@ -127,6 +131,12 @@ def read_labelled_only_smiles():
     """Returns a generator [(molid, smiles)] of the labelled molecules."""
     for molid, _, _, _, _, smiles in read_labelled_smiles():
         yield molid, smiles
+
+
+def read_labelled_only_smiles_class():
+    """Returns a generator [(molid, class)] of the labelled molecules."""
+    for molid, _, _, clazz, _, smiles in read_labelled_smiles():
+        yield molid, clazz
 
 
 def read_unlabelled_smiles():
