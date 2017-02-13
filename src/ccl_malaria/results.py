@@ -282,7 +282,7 @@ def compute_heldout(dset,
         Xlab, _ = deployers(dset='lab')
         y = y_provider()
         stacker.fit(Xlab, y)  # Careful: Xlab columns can be extremelly collinear...
-        if True:
+        if isinstance(stacker, LinearRegression):
             scores = stacker.predict(X)
         else:
             scores = stacker.predict_proba(X)[:, 1]
