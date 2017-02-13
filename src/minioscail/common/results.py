@@ -24,6 +24,8 @@ import os
 import os.path as op
 import h5py
 import joblib
+import warnings
+from sklearn import clone
 
 
 class ResultInDisk(object):
@@ -66,10 +68,18 @@ class ResultInDisk(object):
                 self._ids_cache[dset] = ids
         return self._ids_cache[dset]
 
-    def model_setup(self):
-        if self._model_cache is None:
-            self._model_cache = joblib.load(op.join(self.model_dir, 'model_setup.pkl'))
-        return self._model_cache
+    def model_setup(self, with_bug=False, disable_warnings=True):
+        def do():
+            if self._model_cache is None:
+                self._model_cache = joblib.load(op.join(self.model_dir, 'model_setup.pkl'))
+            if with_bug:
+                return self._model_cache
+            return clone(self._model_cache)
+        if not disable_warnings:
+            return do()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', category=UserWarning)
+            return do()
 
     def root_key(self):
         return self.eval_dir[len(self.container_dir) + 1:]
