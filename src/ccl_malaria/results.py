@@ -186,10 +186,10 @@ class MalariaCVResult(ResultInDisk):
             scores[fold_indices] = fold_scores
         return scores
 
-    def fold_model(self, fold_num):  # Logreg-only, but abstract in superclass
+    def fold_model(self, fold_num, with_bug=False):  # Logreg-only, but abstract in superclass
         """Returns the classifier for a fold."""
         with h5py.File(self.fold_h5(fold_num)) as h5:
-            model = self.model_setup()
+            model = self.model_setup(with_bug=with_bug)
             model.coef_ = h5['logreg_coef'][:]
             model.intercept_ = h5['logreg_intercept'][:]
         return model
@@ -220,7 +220,7 @@ def compute_confirmatory(deployers,
                          y_provider=None,
                          select_top=500,
                          mc=None):
-    """Scores and rankings on plain-average for the labellen / ambiguous dataset."""
+    """Scores and rankings on plain-average for the labelled / ambiguous dataset."""
 
     # Labelled
     Xlab, f_names = deployers(dset='lab')
@@ -368,6 +368,7 @@ def compute_submissions(prefix,
 # noinspection PyTypeChecker
 def final_merged_submissions(calibrate=False,
                              select_top_scr=None,
+                             with_bug=False,
                              dest_dir=MALARIA_EXPS_ROOT):
     """Very ad-hoc merge of submissions obtained with trees and logistic regressors."""
 
@@ -408,7 +409,8 @@ def final_merged_submissions(calibrate=False,
         return lab, amb, unl, scr
 
     tlab, tamb, tunl, tscr = read_average_merge(MALARIA_TREES_EXPERIMENT_ROOT, 'trees')
-    llab, lamb, lunl, lscr = read_average_merge(MALARIA_LOGREGS_EXPERIMENT_ROOT, 'logreg')
+    llab, lamb, lunl, lscr = read_average_merge(MALARIA_LOGREGS_EXPERIMENT_ROOT,
+                                                malaria_logreg_file_prefix(with_bug=with_bug))
 
     lab = DataFrame({'trees': tlab, 'logregs': llab})
     lab['labels'] = mc.molids2labels(lab.index, as01=True)
@@ -447,18 +449,22 @@ def final_merged_submissions(calibrate=False,
     submission_amb = (amb.trees + amb.logregs) / 2
     submission_hts = pd.concat((submission_lab, submission_amb))
 
-    outfile = op.join(dest_dir, 'final-merged-%s-hitSelection.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
+    submission_options = '%s-%s' % (
+        'calibrated' if calibrate else 'nonCalibrated',
+        'lastFold' if with_bug else 'averageFolds')
+
+    outfile = op.join(dest_dir, 'final-merged-%s-hitSelection.csv' % submission_options)
     save_submission(submission_hts, outfile)
 
     #####
     # 4 Average predictions for unlabelled
     #####
     submission_unl_avg = (unl.trees + unl.logregs) / 2
-    outfile = op.join(dest_dir, 'final-%s-avg-unl.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
+    outfile = op.join(dest_dir, 'final-%s-avg-unl.csv' % submission_options)
     save_submission(submission_unl_avg, outfile, select_top=None)
 
     submission_scr_avg = (scr.trees + scr.logregs) / 2
-    outfile = op.join(dest_dir, 'final-%s-avg-scr.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
+    outfile = op.join(dest_dir, 'final-%s-avg-scr.csv' % submission_options)
     save_submission(submission_scr_avg, outfile, select_top=select_top_scr)
 
     #####
@@ -469,18 +475,22 @@ def final_merged_submissions(calibrate=False,
 
     # noinspection PyArgumentList
     submission_unl_st = Series(data=stacker.predict(unl[['trees', 'logregs']]), index=unl.index)
-    outfile = op.join(dest_dir, 'final-%s-stacker=linr-unl.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
+    outfile = op.join(dest_dir, 'final-%s-stacker=linr-unl.csv' % submission_options)
     save_submission(submission_unl_st, outfile, select_top=None)
 
     # noinspection PyArgumentList
     submission_scr_st = Series(data=stacker.predict(scr[['trees', 'logregs']]), index=scr.index)
-    outfile = op.join(dest_dir, 'final-%s-stacker=linr-scr.csv' % ('calibrated' if calibrate else 'nonCalibrated'))
+    outfile = op.join(dest_dir, 'final-%s-stacker=linr-scr.csv' % submission_options)
     save_submission(submission_scr_st, outfile, select_top=select_top_scr)
+
+    # TODO: document that:
+    #   - Averaging averages averages
+    #   - Stacking stacks stacks
+    # read the code to understand what I mean
 
 
 if __name__ == '__main__':
     import argh
-
     parser = argh.ArghParser()
     parser.add_commands([final_merged_submissions])
     parser.dispatch()
