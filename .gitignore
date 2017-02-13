@@ -48,3 +48,4 @@ docs/.ipynb_checkpoints
 src/integration/thirdparty
 
 --meta/
+.cache/
