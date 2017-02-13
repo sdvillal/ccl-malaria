@@ -309,7 +309,7 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=Fal
     Note that parsing this format is quite consuming, so we recommend to simplify it if a subset of this information
     is to be read repeatly.
     """
-    writer = gzip.open(output_file, 'w')
+    writer = gzip.open(output_file, 'wt')
 
     def process(molid, smiles):
         if molid is _END_MOLID:
@@ -392,7 +392,7 @@ def ecfps_mp(numjobs=None, dest_dir=None):
 
 def munge_ecfps():
 
-    # ---Step 1: put all these together in 3 files, lab, unl and scr.
+    # --- Step 1: put all these together in 3 files, lab, unl and scr.
     #       - ECFPs and FCFPs for the same mol are together
     #       - The order is the same as in the original file
     #       - Optionally delete the workers files
@@ -426,7 +426,9 @@ def munge_ecfps():
                     yield line
 
     class Chihuahua(object):
-        """A data processor that takes weirdfp lines, hunk them in disk and then merge them sorted in a big file.
+        """
+        A data processor that takes weirdfp lines, chunk them in disk
+        and then merge them sorted in a big file.
         It can be setup to be easy on memory usage (at the cost of doubling disk space usage).
         """
         def __init__(self, molid2i, root, prefix, data2molid, chunksize=10000):
@@ -487,8 +489,10 @@ def munge_ecfps():
 
     # ---Step 2: recode ECFPs and FCFPs from the file at step 1. After this:
     #  - ECFPs and FCFPs duplicates get merged.
-    #  - A unique assignment for each substructure in the dataset to a int [0, ...] (column number).
-    #  - A unique assignment for each molid in the dataset for wich Morgan DID NOT FAIL (row number).
+    #  - A unique assignment for each substructure in the dataset
+    #    to an int [0, ...] (column number) is generated.
+    #  - A unique assignment for each molid in the dataset
+    #    for wich Morgan DID NOT FAIL (row number) is generated.
 
     def ecfps_recode(dset='lab'):
         """Merges ECFPs and FCFPs into a single line and gets rid of the centers information if present."""
