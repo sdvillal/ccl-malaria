@@ -22,7 +22,7 @@ from minioscail.common.eval import cv_splits, enrichment_at
 from ccl_malaria.features import MurmurFolder, MalariaFingerprintsExampleSet
 from ccl_malaria.results import predict_malaria_unlabelled, save_molids
 from minioscail.common.config import mlexp_info_helper
-from minioscail.common.misc import ensure_dir, giveupthefunc
+from minioscail.common.misc import ensure_dir
 
 
 MALARIA_LOGREGS_EXPERIMENT_ROOT = op.join(MALARIA_EXPS_ROOT, 'logregs')
@@ -120,7 +120,8 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
             ('tol', logreg_tol),
             ('fit_intercept', logreg_fit_intercept),
             ('intercept_scaling', logreg_intercept_scaling),
-            ('random_state', my_rng.randint(low=0, high=1000 ** 4)),
+            ('random_state', my_rng.randint(low=0, high=4294967294)),
+            # Changed, from original 1000**4, to make liblinear happy
         ))
         model_setup = LogisticRegression(**logreg_params)
         model_id = 'skllogreg__%s' % '__'.join(['%s=%s' % (k, str(v)) for k, v in logreg_params.items()])
@@ -199,6 +200,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
             train_i, test_i = cver(cv_fold_num)
             Xtrain, ytrain = X[train_i, :], y[train_i]
             Xtest, ytest = X[test_i, :], y[test_i]
+            assert len(set(train_i) & set(test_i)) == 0
 
             # Copy the model...
             model = clone(model_setup)
@@ -250,7 +252,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
                     title='malaria-trees-oob',
                     data_setup=data_id,
                     model_setup=model_id,
-                    exp_function=giveupthefunc(),
+                    exp_function=fit_logregs,
                 )
                 metainfo.update((
                     ('train_time', train_time),
@@ -271,10 +273,10 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
 
         # Summarize cross-val in the info file
         metainfo = mlexp_info_helper(
-            title='malaria-trees-oob',
+            title='malaria-logregs-cv',
             data_setup=data_id,
             model_setup=model_id,
-            exp_function=giveupthefunc(),
+            exp_function=fit_logregs,
         )
         metainfo.update((
             ('num_cv_folds', num_cv_folds),
