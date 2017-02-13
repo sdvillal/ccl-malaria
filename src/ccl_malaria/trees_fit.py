@@ -162,7 +162,7 @@ def fit_trees(dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
             title='malaria-trees-oob',
             data_setup=data_id,
             model_setup=model_id,
-            exp_function=giveupthefunc(),
+            exp_function=fit_trees,
         )
         metainfo.update((
             ('train_time', train_time),
