@@ -220,6 +220,7 @@ def one_line_pickle(obj, filepath):
 
 #######################
 # Runtime introspection to get info on the calling functions
+# TODO: very outdated, use whatami
 #######################
 
 def giveupthefunc(frame=1):
