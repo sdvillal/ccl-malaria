@@ -2,7 +2,6 @@
 import json
 import os.path as op
 from glob import glob
-from itertools import izip
 
 import h5py
 import joblib
@@ -247,7 +246,9 @@ def compute_confirmatory(deployers,
 
     # Rankings
     ranks, (sscores, smolids, slabels, spec50s, ssmiles) = \
-        rank_sort(scores, (scores, molids, labels, pec50s, smiles), reverse=True, select_top=select_top)
+        rank_sort(scores, (scores, molids, labels, pec50s, smiles),
+                  reverse=True,
+                  select_top=select_top)
 
     # N.B.
     # if analyzing ranking variability, use instead
@@ -255,14 +256,13 @@ def compute_confirmatory(deployers,
 
     # Save for submission
     with open(outfile, 'w') as writer:
-        for molid, smiles, score in izip(smolids, ssmiles, sscores):
+        for molid, smiles, score in zip(smolids, ssmiles, sscores):
             writer.write('%s,%s,%.6f\n' % (molid, smiles, score))
 
     # Create and save a pandas series to allow further stacking
     s = Series(data=scores, index=molids)
     s.to_pickle(op.join(op.splitext(outfile)[0] + '.pkl'))
 
-    # TODO Flo: create a molecules plot, interpret it
     return molids, scores
 
 
@@ -301,7 +301,7 @@ def compute_heldout(dset,
 
     # Save for submission
     with open(outfile, 'w') as writer:
-        for molid, smiles, score in izip(smolids, ssmiles, sscores):
+        for molid, smiles, score in zip(smolids, ssmiles, sscores):
             writer.write('%s,%s,%.6f\n' % (molid, smiles, score))
 
     # Create and save a pandas series to allow further stacking
@@ -318,7 +318,10 @@ def compute_submissions(prefix,
                         y_provider,
                         do_confirmatory=True,
                         do_heldout=True,
-                        do_screening=True):
+                        do_screening=True,
+                        confirmatory_top=500,
+                        scr_top=1000):
+
     info('Computing submissions for %s' % prefix)
 
     mc = MalariaCatalog()  # For performance, maybe this should be singleton...
@@ -328,7 +331,7 @@ def compute_submissions(prefix,
                              molids_provider,
                              outfile=op.join(dest_dir, '%s_hitSelection.txt' % prefix),
                              y_provider=y_provider,
-                             select_top=500)
+                             select_top=confirmatory_top)
 
     def do_predict(dset, select_top=None):
 
@@ -358,7 +361,7 @@ def compute_submissions(prefix,
         do_predict('unl')
 
     if do_screening:
-        do_predict('scr', select_top=1000)
+        do_predict('scr', select_top=scr_top)
 
 
 #########
@@ -378,6 +381,7 @@ def final_merged_submissions(calibrate=False,
 
     # Avoid circular imports
     from ccl_malaria.logregs_fit import MALARIA_LOGREGS_EXPERIMENT_ROOT
+    from ccl_malaria.logregs_analysis import malaria_logreg_file_prefix
     from ccl_malaria.trees_fit import MALARIA_TREES_EXPERIMENT_ROOT
 
     mc = MalariaCatalog()
@@ -393,7 +397,7 @@ def final_merged_submissions(calibrate=False,
                                    smiles), reverse=True, select_top=select_top)
         # Save for submission
         with open(outfile, 'w') as writer:
-            for molid, smiles, score in izip(smolids, ssmiles, sscores):
+            for molid, smiles, score in zip(smolids, ssmiles, sscores):
                 writer.write('%s,%s,%.6f\n' % (molid, smiles, score))
 
     #####
@@ -428,19 +432,20 @@ def final_merged_submissions(calibrate=False,
     #####
     # 2 Calibration on labelling - careful with overfitting for hitList, do it in cross-val fashion
     #####
-    def calibrate_row(row):
+    def calibrate_col(col):
+        # isotonic not the best here, and faces numerical issues
         calibrator = IsotonicRegression(y_min=0, y_max=1)
-        x = lab[~np.isnan(lab[row])][row].values
-        y = lab[~np.isnan(lab[row])]['labels'].values
-        calibrator.fit(x, y)
-        lab[row] = calibrator.predict(lab[row].values)
-        amb[row] = calibrator.predict(amb[row].values)
-        unl[row] = calibrator.predict(unl[row].values)
-        scr[row] = calibrator.predict(scr[row].values)
+        x = lab[~np.isnan(lab[col])][col].values
+        y = lab[~np.isnan(lab[col])]['labels'].values
+        calibrator.fit(x.reshape(-1, 1), y)
+        lab[col] = calibrator.predict(lab[col].values.reshape(-1, 1))
+        amb[col] = calibrator.predict(amb[col].values.reshape(-1, 1))
+        unl[col] = calibrator.predict(unl[col].values.reshape(-1, 1))
+        scr[col] = calibrator.predict(scr[col].values.reshape(-1, 1))
 
     if calibrate:
-        calibrate_row('trees')
-        calibrate_row('logregs')
+        calibrate_col('trees')
+        calibrate_col('logregs')
 
     #####
     # 3 Average for the submission in lab-amb
