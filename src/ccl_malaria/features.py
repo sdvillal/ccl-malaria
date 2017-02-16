@@ -1,6 +1,8 @@
 # coding=utf-8
 """Feature generation and munging."""
 from __future__ import print_function, division
+
+import time
 from future.utils import string_types
 from array import array
 from glob import glob
@@ -12,17 +14,17 @@ import gzip
 import os
 
 import h5py
-from joblib import Parallel, cpu_count, delayed
+from joblib import Parallel, delayed
 import numpy as np
 import argh
-from rdkit.Chem import AllChem
 from scipy.sparse import coo_matrix, csr_matrix, vstack
 from sklearn.utils.murmurhash import murmurhash3_32 as murmur
 
 from ccl_malaria import info
 from ccl_malaria import MALARIA_DATA_ROOT
 from ccl_malaria.molscatalog import read_smiles_ultraiterator, MOLS2MOLS, MalariaCatalog
-from ccl_malaria.rdkit_utils import explain_circular_substructure, RDKitDescriptorsComputer, to_rdkit_mol
+from ccl_malaria.rdkit_utils import RDKitDescriptorsComputer, to_rdkit_mol, morgan_fingerprint
+
 from minioscail.common.config import Configurable
 from minioscail.common.misc import ensure_dir, is_iterable
 
@@ -83,10 +85,10 @@ class ExampleSet(Configurable):
 ##################################################
 
 
-_END_MOLID = None  # Marker smiles for end of iteration.
+_END_MOLID = None  # Marker for end of iteration.
 
 
-def _molidsmiles_it(start=0, step=46, mols=None, processor=None, logeach=500):
+def _molidsmiles_it(start=0, step=46, mols=None, processor=None, log_each=500):
     """Iterates (molindex, molid, smiles) triplets skipping step molecules in each iteration.
     This is useful for evenly splitting workloads between processors / machines.
     Parameters:
@@ -97,9 +99,9 @@ def _molidsmiles_it(start=0, step=46, mols=None, processor=None, logeach=500):
                    when the iterator is exhausted, (_END_MOLID, None) is sent.
     """
     if mols is None:
-        mols = read_smiles_ultraiterator()
+        mols = read_smiles_ultraiterator()  # This could benefit quite a bit of async IO
     for molindex, (molid, smiles) in enumerate(islice(mols, start, None, step)):
-        if logeach > 0 and molindex > 0 and not molindex % logeach:
+        if log_each > 0 and molindex > 0 and not molindex % log_each:
             info('Molecule %d' % molindex)
         processor(molid, smiles)
     processor(_END_MOLID, None)
@@ -290,24 +292,74 @@ _MALARIA_ECFPS_DIR = op.join(MALARIA_DATA_ROOT, 'rdkit', 'ecfps')
 _MALARIA_ECFPS_PARALLEL_RESULTS_DIR = op.join(_MALARIA_ECFPS_DIR, 'from_workers')
 
 
-def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=False):
-    """Returns a (molid, smiles) processor that computes ecfps on the smiles and stores them in a text file.
+def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
+                 write_centers=True, write_radius=True, write_bit_keys=True):
+    """
+    Returns a (molid, smiles) processor that computes ecfps on the smiles and stores them in a text file.
+
+    By default, the saved file (format) contains quite a bit or redundant or useless information.
 
     Parameters:
-      - output_file: where the fingerprints will be written; this file will be overwritten and gzipped.
-      - max_radius: the maximum radius for the found circular substructures.
-      - fcfp: whether to generate FCFP or ECFP like fingerprints.
-      - write_centers: whether to also save all the centers of each substructure or not.
+    -----------
+    output_file : string
+      path to the file where the fingerprints will be written.
+      This file will be overwritten and gzipped.
+
+    max_radius : int, default 200
+      the maximum radius for the found circular substructures.
+
+    fcfp : bool, default False
+      whether to generate FCFP or ECFP like fingerprints.
+
+    write_centers : bool, default True
+      whether to also save all the centers of each substructure or not.
+
+    write_radius : bool, default True
+      whether to also save all the radius generating each substructure or not.
+
+    writ_bit_keys : bool, default True
+      whether to also save all the corresponding rdkit hash for each feature or not.
 
     Returns:
-      - a processor function ready to be used as a parameter to _molidsmiles_it.
+      - a processor function ready to be used as a parameter to `_molidsmiles_it`.
 
+
+    File format
+    -----------
+
+    We call the format generated "weird fp format".
+    For each molecule for which fingerprinting works we have a line like this:
+        \tv1\t[|C|R|K|CR|CK|RK|CRK]\tmolid[\tcansmi count [center radius hash]+]+
+      For example:
+        '\tv1\tCRK\tmol1\tC 4 1 1 33 2 1 33\tB 1 1 1 22\tBC 1 1 2 1789'
+      Parses to:
+        - v1: version tag of the format
+        - CRK: for each feature we additionally store C=Center, R=Radius, K=bit Key
+        - mol1: the molecule id
+        - C 2 1 1 33 2 1 33: feature explained by smiles C appears twice
+                              centered at atoms 1 and 2, with radius 1, with hash 33
+        - B 3 1 1 22: feature explained by smiles D appears once at atom 3, radius 1,
+                      hashes to 22
+        - BC 1 1 2 1789: feature explained by smiles BC appears once at atom 1, radius 2,
+                         hashes to 1789.
+    If there is an error with the molecule, a line like this is written:
+        molid\t*FAILED*\tErrorMessage
+
+    Note that parsing this format is quite consuming, so munge this information
+    into more efficient formats for reading, specially if (a subset of) it is to
+    be read repeatly.
+
+    Legacy file format
+    ------------------
+
+    The legacy, competition version "the weird fp format" looked like this
     We call the format generated "weird fp format". On each line we have either:
         molid[\tcansmi count [center radius]+]+
     or, if there is an error with the molecule:
         molindex\molid\t*FAILED*
-    Note that parsing this format is quite consuming, so we recommend to simplify it if a subset of this information
-    is to be read repeatly.
+    It can be detected because the line does not start by a tab. Remove that ugly
+    tab when the competition data is not relevant anymore (or just rewrite that data
+    into the new format).
     """
     writer = gzip.open(output_file, 'wt')
 
@@ -316,29 +368,31 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=Fal
             writer.close()
             return
         try:
-            mol = to_rdkit_mol(smiles)
-            fpsinfo = {}
-            # N.B. We won't actually use rdkit hash, so we won't ask for nonzero values...
-            # Is there a way of asking rdkit to give us this directly?
-            AllChem.GetMorganFingerprint(mol, max_radius, bitInfo=fpsinfo, useFeatures=fcfp)
-            counts = defaultdict(int)
-            centers = defaultdict(list)
-            for bit_descs in fpsinfo.values():
-                for center, radius in bit_descs:
-                    cansmiles = explain_circular_substructure(mol, center, radius)
-                    counts[cansmiles] += 1
-                    centers[cansmiles].append((center, radius))
-            if write_centers:
-                features_strings = ['%s %d %s' % (cansmiles,
-                                                  count,
-                                                  ' '.join(['%d %d' % (c, r) for c, r in centers[cansmiles]]))
-                                    for cansmiles, count in counts.items()]
-            else:
-                features_strings = ['%s %d' % (cansmiles, count) for cansmiles, count in counts.items()]
-            writer.write('%s\t%s\n' % (molid, '\t'.join(features_strings)))
-        except:
-            info('Failed molecule %s: %s' % (molid, smiles))
-            writer.write('%s\t*FAILED*\n' % molid)
+            cansmi2fptinfo = morgan_fingerprint(smiles,
+                                                max_radius=max_radius,
+                                                fcfp=fcfp)
+            extra_info = '%s%s%s' % ('C' if write_centers else '',
+                                     'R' if write_radius else '',
+                                     'K' if write_bit_keys else '')
+            header = '\tv1\t%s\t%s' % (extra_info, molid)
+            features_strings = []
+            for cansmiles, feature_info in cansmi2fptinfo.items():
+                feature_string = '%s %d' % (cansmiles, len(feature_info))
+                if 0 < len(extra_info):
+                    extra_info = []
+                    for center, radius, bit_key in feature_info:
+                        if write_centers:
+                            extra_info.append(str(center))
+                        if write_radius:
+                            extra_info.append(str(radius))
+                        if write_bit_keys:
+                            extra_info.append(str(bit_key))
+                    feature_string += ' ' + ' '.join(extra_info)
+                features_strings.append(feature_string)
+            writer.write('%s %s\n' % (header, '\t'.join(features_strings)))
+        except Exception as ex:
+            info('Failed molecule %s: %s; exception: %s' % (molid, smiles, str(ex)))
+            writer.write('%s\t*FAILED*\t%s\n' % (molid, str(ex)))
     return process
 
 
@@ -361,33 +415,52 @@ def morgan(start=0, step=46, mols='lab', output_file=None, fcfp=True):
                     processor=_ecfp_writer(output_file=output_file, fcfp=fcfp))
 
 
-def _molidsmiles_it_ecfp(output_file, start=0, step=46, fcfp=True, logeach=5000):
+def _molidsmiles_it_ecfp(output_file, start=0, step=46,
+                         write_centers=True, write_radius=True, write_bit_keys=True,
+                         fcfp=True,
+                         log_each=5000):
     """Q&D variant to allow Parallel work (cannot pickle closures or reuse iterators...)."""
-    processor = _ecfp_writer(output_file=output_file, fcfp=fcfp)
+    processor = _ecfp_writer(output_file=output_file, fcfp=fcfp,
+                             write_centers=write_centers,
+                             write_radius=write_radius,
+                             write_bit_keys=write_bit_keys)
     mols = read_smiles_ultraiterator()
+    t0 = time.time()
     for molindex, (molid, smiles) in enumerate(islice(mols, start, None, step)):
-        if logeach > 0 and molindex > 0 and not molindex % logeach:
-            info('Molecule %d' % molindex)
+        if log_each > 0 and molindex > 0 and not molindex % log_each:
+            taken = time.time() - t0
+            info('Molecule %d (%.2fs, %.2f mol/s)' % (molindex, taken, molindex / taken))
         processor(molid, smiles)
     processor(_END_MOLID, None)
 
 
-def morgan_mp(numjobs=None, dest_dir=None):
+def morgan_mp(num_jobs=1, dest_dir=None,
+              write_centers=True, write_radius=True, write_bit_keys=True,
+              no_ecfps=False,
+              no_fcfps=False,
+              log_each=5000):
     """Python-parallel computation of ECFPs.
     Parameters:
-      - numjobs: the number of threads to use (None=all in the machine).
+      - num_jobs: the number of threads to use (joblib semantics for negative numbers).
       - dest_dir: the directory to which the fingerprints will be written, in weird fp format(TM).
     """
+    # Dest dir
     dest_dir = _MALARIA_ECFPS_PARALLEL_RESULTS_DIR if dest_dir is None else dest_dir
     ensure_dir(dest_dir)
-    numjobs = cpu_count() if numjobs is None else int(numjobs)
-    Parallel(n_jobs=numjobs)(delayed(_molidsmiles_it_ecfp)
-                             (start=start,
-                              step=numjobs,
-                              output_file=op.join(dest_dir, 'all__fcfp=%r__start=%d__step=%d.weirdfps' %
-                                                            (fcfp, start, numjobs)),
-                              fcfp=fcfp)
-                             for start, fcfp in product(range(numjobs), (True, False)))
+    # What to compute: nothing, ECFPS (contains False), FCFPS (contains True)
+    invariants = [] + ([False] if not no_ecfps else []) + ([True] if not no_fcfps else [])
+    # Parallel run
+    Parallel(n_jobs=num_jobs)(delayed(_molidsmiles_it_ecfp)
+                              (start=start,
+                               step=num_jobs,
+                               output_file=op.join(dest_dir, 'all__fcfp=%r__start=%d__step=%d.weirdfps.gz' %
+                                                   (fcfp, start, num_jobs)),
+                               fcfp=fcfp,
+                               write_centers=write_centers,
+                               write_radius=write_radius,
+                               write_bit_keys=write_bit_keys,
+                               log_each=log_each)
+                              for start, fcfp in product(range(num_jobs), invariants))
 
 
 def munge_morgan():
@@ -951,7 +1024,7 @@ class MurmurFolder(Configurable):
     def assign_feature(self, substructures):
         if not is_iterable(substructures):
             substructures = (substructures,)
-        features = self.hash(substructures) % self.fold_size
+        features = self.hash(substructures) % self.fold_size  # TODO: there is a bug here, no?
         if self._save_map:
             for feature, key in zip(features, substructures):
                 self._features[feature].add(key)
