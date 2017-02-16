@@ -1,9 +1,5 @@
 #!/bin/bash
 
-pushd `dirname $0` > /dev/null
-myDir=`pwd`
-popd > /dev/null
-
 echo "
 After running as many experiments as we want with logistic regression, it is time to deploy
 (generate predictions for the unlabelled sets of molecules). Here we use the following approach:
@@ -17,4 +13,4 @@ It is important to note that in no case we use predictions on any molecule that 
 "
 
 # L1-regularized models for submission
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/logregs_analysis.py do-logreg-submissions
+PYTHONUNBUFFERED=1 cc-malaria logregs submit

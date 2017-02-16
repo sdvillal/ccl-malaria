@@ -1,11 +1,6 @@
 #!/bin/bash
 
-pushd `dirname $0` > /dev/null
-myDir=`pwd`
-popd > /dev/null
-
 echo "We will compute tree ensembles using the rdkit descriptors."
-echo "This will create files blah..."
 echo "Here we illustrate:"
 echo "  - feature selection via ensembles of trees"
 echo "  - the importance of model parameter selection"
@@ -15,4 +10,4 @@ echo "  - ..."
 echo "  - and something about chemistry!"
 echo "This will require quite a bit of memory and time..."
 
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/trees.py fit-trees
+PYTHONUNBUFFERED=1 ccl-malaria trees fit

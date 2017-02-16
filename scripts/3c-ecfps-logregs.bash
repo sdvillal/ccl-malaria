@@ -1,12 +1,9 @@
 #!/bin/bash
 
-pushd `dirname $0` > /dev/null
-myDir=`pwd`
-popd > /dev/null
-
 echo "
-Once we have computed all the fingerprints and store them in a suitable,
-high performance format, we can quickly evaluate linear models that exploit this sparsity.
+Once we have computed all the fingerprints and stored them in a suitable,
+high performance format, we can quickly evaluate linear models that, hopefully,
+exploit sparsity.
 
 Here we will fit logistic regression models using both:
    - scikit learn wrapper over LibLinear (all data need to be in memory)
@@ -27,19 +24,19 @@ information needed to use these for feature selection and model deployment purpo
 "
 
 # L1-regularized models for submission
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/logregs_fit.py fit-logregs \
---logreg-penalty l1 --logreg-C 1 --logreg-tol 1E-4 --logreg-class-weight-auto \
+PYTHONUNBUFFERED=1 ccl-malaria logregs fit \
+--penalty l1 --C 1 --tol 1E-4 --class-weight-auto \
 --num-cv-folds 10 --cv-seeds 0 1 2 3 4 5 --min-fold-auc 0.88 \
 --fingerprint-folder-seed 0 --fingerprint-fold-size 1023
 
 # L1-regularized models for submission over non-folded fingerprints
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/logregs_fit.py fit-logregs \
---logreg-penalty l1 --logreg-C 1 --logreg-tol 1E-4 --logreg-class-weight-auto \
+PYTHONUNBUFFERED=1 ccl-malaria logregs fit \
+--penalty l1 --C 1 --tol 1E-4 --class-weight-auto \
 --num-cv-folds 10 --cv-seeds 0 1 2 3 4 5 --min-fold-auc 0.88 \
 --fingerprint-folder-seed 0 --fingerprint-fold-size 0
 
 # L2-regularized models for submission over non-folded fingerprints
-PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/logregs_fit.py fit-logregs \
---logreg-penalty l2 --logreg-C 5 --logreg-tol 1E-4 --logreg-class-weight-auto \
+PYTHONUNBUFFERED=1 ccl-malaria logregs fit \
+--penalty l2 --C 5 --tol 1E-4 --class-weight-auto \
 --num-cv-folds 10 --cv-seeds 0 1 2 3 4 5 --min-fold-auc 0.88 \
 --fingerprint-folder-seed 0 --fingerprint-fold-size 0

@@ -10,7 +10,7 @@ echo "    http://www.rdkit.org/docs/GettingStartedInPython.html#list-of-availabl
 echo "Go to sleep, (this took around 32 hours in our machine)."
 
 for molsSet in unl lab scr; do
-  outFile="${myDir}/data/rdkit/rdkfs/${molsSet}rdkf.h5"
-  params="rdkfs --start 0 --step 1 --mols ${molsSet} --output-file \"$outFile\""
-  PYTHONPATH="${myDir}/src:${PYTHONPATH}" python2 -u ${myDir}/src/malaria/features.py $params
+  outFile="${myDir}/../data/rdkit/rdkfs/${molsSet}rdkf.h5"
+  params="--start 0 --step 1 --mols ${molsSet} --output-file \"$outFile\""
+  PYTHONUNBUFFERED=1 ccl-malaria features rdkfs ${params}
 done
