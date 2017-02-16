@@ -149,17 +149,17 @@ def trees_y():
     return MalariaCatalog().molids2labels(trees_molids(dset='lab'), as01=True)
 
 
-def do_trees_submissions(do_confirmatory=True,
-                         do_heldout=True,
-                         do_screening=True):
+def submit(no_confirmatory=False,
+           no_heldout=False,
+           no_screening=False):
     compute_submissions(prefix='trees',
                         dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
                         deployers=trees_deployers,
                         molids_provider=trees_molids,
                         y_provider=trees_y,
-                        do_confirmatory=do_confirmatory,
-                        do_heldout=do_heldout,
-                        do_screening=do_screening)
+                        do_confirmatory=not no_confirmatory,
+                        do_heldout=not no_heldout,
+                        do_screening=not no_screening)
     info('Submissions computed!')
 
 
@@ -167,5 +167,5 @@ if __name__ == '__main__':
     import argh
 
     parser = argh.ArghParser()
-    parser.add_commands([do_trees_submissions])
+    parser.add_commands([submit])
     parser.dispatch()

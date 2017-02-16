@@ -23,13 +23,13 @@ from minioscail.common.misc import ensure_dir, giveupthefunc, fill_missing_score
 MALARIA_TREES_EXPERIMENT_ROOT = op.join(MALARIA_EXPS_ROOT, 'trees')
 
 
-def fit_trees(dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
-              seeds=(0, 1, 2, 3, 4),
-              num_treess=(10, 6000, 4000, 2000, 1000, 500, 20, 50, 100),
-              save_trained_models=False,
-              chunksize=200000,
-              num_threads=None,
-              force=False):
+def fit(dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
+        seeds=(0, 1, 2, 3, 4),
+        num_treess=(10, 6000, 4000, 2000, 1000, 500, 20, 50, 100),
+        save_trained_models=False,
+        chunksize=200000,
+        num_threads=None,
+        force=False):
 
     # Generates OOB results
 
@@ -162,7 +162,7 @@ def fit_trees(dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
             title='malaria-trees-oob',
             data_setup=data_id,
             model_setup=model_id,
-            exp_function=fit_trees,
+            exp_function=fit,
         )
         metainfo.update((
             ('train_time', train_time),
@@ -179,5 +179,5 @@ if __name__ == '__main__':
 
     import argh
     parser = argh.ArghParser()
-    parser.add_commands([fit_trees])
+    parser.add_commands([fit])
     parser.dispatch()
