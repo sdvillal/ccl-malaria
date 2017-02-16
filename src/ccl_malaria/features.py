@@ -342,7 +342,7 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False, write_centers=Fal
     return process
 
 
-def ecfps(start=0, step=46, mols='lab', output_file=None, fcfp=True):
+def morgan(start=0, step=46, mols='lab', output_file=None, fcfp=True):
     """Entry point for the command line to generate fingerprints.
     Parameters:
       - start: the index of the first molecule to consider
@@ -372,7 +372,7 @@ def _molidsmiles_it_ecfp(output_file, start=0, step=46, fcfp=True, logeach=5000)
     processor(_END_MOLID, None)
 
 
-def ecfps_mp(numjobs=None, dest_dir=None):
+def morgan_mp(numjobs=None, dest_dir=None):
     """Python-parallel computation of ECFPs.
     Parameters:
       - numjobs: the number of threads to use (None=all in the machine).
@@ -390,7 +390,7 @@ def ecfps_mp(numjobs=None, dest_dir=None):
                              for start, fcfp in product(range(numjobs), (True, False)))
 
 
-def munge_ecfps():
+def munge_morgan():
 
     # --- Step 1: put all these together in 3 files, lab, unl and scr.
     #       - ECFPs and FCFPs for the same mol are together
@@ -1049,7 +1049,7 @@ def cl(step=46, for_what='rdkf'):
             runid = 'fcfp=%r__start=%d__step=%d' % (fcfp, start, step)
             destfile = '~/tdtmalaria/data/rdkit/ecfps/from_workers/%s.weirdfps' % runid
             logfile = '~/tdtmalaria/data/rdkit/ecfps/from_workers/%s.log' % runid
-            print('PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py ecfps '
+            print('PYTHONUNBUFFERED=1 ccl-malaria features morgan '
                   '--start %d --step %d --output-file %s %s &>%s' %
                   (start, step, destfile, '--fcfp' if fcfp else '', logfile))
     if for_what == 'rdkfs':
@@ -1057,7 +1057,7 @@ def cl(step=46, for_what='rdkf'):
             runid = 'rdkdescs__mols=%s__start=%d__step=%d' % (mols, start, step)
             destfile = '~/tdtmalaria/data/rdkit/rdkfs/from_workers/%s.h5' % runid
             logfile = '~/tdtmalaria/data/rdkit/rdkfs/from_workers/%s.log' % runid
-            print('PYTHONPATH=.:$PYTHONPATH python2 -u malaria/features.py rdkf '
+            print('PYTHONUNBUFFERED=1 ccl-malaria features rdkfs '
                   '--start %d --step %d --mols %s --output-file %s &>%s' %
                   (start, step, mols, destfile, logfile))
 
@@ -1070,5 +1070,5 @@ def cl(step=46, for_what='rdkf'):
 if __name__ == '__main__':
 
     parser = argh.ArghParser()
-    parser.add_commands([cl, ecfps, ecfps_mp, munge_ecfps, rdkfs])
+    parser.add_commands([cl, morgan, morgan_mp, munge_morgan, rdkfs])
     parser.dispatch()
