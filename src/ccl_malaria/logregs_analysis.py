@@ -250,12 +250,12 @@ def logreg_y():
     return MalariaCatalog().molids2labels(logreg_molids(dset='lab'), as01=True)
 
 
-def do_logreg_submissions(no_confirmatory=False,
-                          no_heldout=False,
-                          no_screening=False,
-                          with_bug=False,
-                          confirmatory_top=500,
-                          scr_top=1000):
+def submit(no_confirmatory=False,
+           no_heldout=False,
+           no_screening=False,
+           with_bug=False,
+           confirmatory_top=500,
+           scr_top=1000):
     compute_submissions(prefix=malaria_logreg_file_prefix(with_bug=with_bug),
                         dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
                         deployers=partial(logreg_deployers, with_bug=with_bug),
@@ -271,7 +271,7 @@ def do_logreg_submissions(no_confirmatory=False,
 if __name__ == '__main__':
     import argh
     parser = argh.ArghParser()
-    parser.add_commands([do_logreg_submissions])
+    parser.add_commands([submit])
     parser.dispatch()
 
 

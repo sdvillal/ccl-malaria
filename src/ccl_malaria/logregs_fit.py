@@ -50,42 +50,42 @@ def malaria_logreg_fpt_providers(folder):
 #######################################
 
 @argh.arg('--cv-seeds', nargs='+', type=int)
-def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
-                # Logreg params
-                logreg_penalty='l1',
-                logreg_C=1.0,
-                logreg_class_weight_auto=False,
-                logreg_dual=False,
-                logreg_tol=1e-4,
-                logreg_fit_intercept=True,
-                logreg_intercept_scaling=1,
-                # CV params
-                num_cv_folds=10,
-                cv_seeds=(0,),
-                save_unlabelled_predictions=False,
-                save_fold_model=False,
-                min_fold_auc=0.88,
-                # Fingerprint folding params
-                fingerprint_folder_seed=0,
-                fingerprint_fold_size=1023,
-                # Computational requirements params
-                force=False,
-                chunksize=1000000,
-                max_logreg_tol=1E-5):
+def fit(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
+        # Logreg params
+        penalty='l1',
+        C=1.0,
+        class_weight_auto=False,
+        dual=False,
+        tol=1e-4,
+        fit_intercept=True,
+        intercept_scaling=1,
+        # CV params
+        num_cv_folds=10,
+        cv_seeds=(0,),
+        save_unlabelled_predictions=False,
+        save_fold_model=False,
+        min_fold_auc=0.88,
+        # Fingerprint folding params
+        fingerprint_folder_seed=0,
+        fingerprint_fold_size=1023,
+        # Computational requirements params
+        force=False,
+        chunksize=1000000,
+        max_logreg_tol=1E-5):
     """Logistic regression experiment using the liblinear wrapper in sklearn.
     Generates cross-val results
     """
 
-    if max_logreg_tol is not None and logreg_tol < max_logreg_tol:
+    if max_logreg_tol is not None and tol < max_logreg_tol:
         info('Ignoring long intolerant experiments')
         return
 
     info('Malaria logregs experiment')
 
     # Command line type inference is rotten...
-    logreg_C = float(logreg_C)
-    logreg_tol = float(logreg_tol)
-    logreg_intercept_scaling = float(logreg_intercept_scaling)
+    C = float(C)
+    tol = float(tol)
+    intercept_scaling = float(intercept_scaling)
     num_cv_folds = int(num_cv_folds)
     min_fold_auc = float(min_fold_auc)
     fingerprint_folder_seed = int(fingerprint_folder_seed)
@@ -113,13 +113,13 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
 
         # Experiment context: model
         logreg_params = OrderedDict((
-            ('penalty', logreg_penalty),
-            ('C', logreg_C),
-            ('class_weight', 'auto' if logreg_class_weight_auto else None),
-            ('dual', logreg_dual),
-            ('tol', logreg_tol),
-            ('fit_intercept', logreg_fit_intercept),
-            ('intercept_scaling', logreg_intercept_scaling),
+            ('penalty', penalty),
+            ('C', C),
+            ('class_weight', 'auto' if class_weight_auto else None),
+            ('dual', dual),
+            ('tol', tol),
+            ('fit_intercept', fit_intercept),
+            ('intercept_scaling', intercept_scaling),
             ('random_state', my_rng.randint(low=0, high=4294967294)),
             # Changed, from original 1000**4, to make liblinear happy
         ))
@@ -252,7 +252,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
                     title='malaria-trees-oob',
                     data_setup=data_id,
                     model_setup=model_id,
-                    exp_function=fit_logregs,
+                    exp_function=fit,
                 )
                 metainfo.update((
                     ('train_time', train_time),
@@ -276,7 +276,7 @@ def fit_logregs(dest_dir=MALARIA_LOGREGS_EXPERIMENT_ROOT,
             title='malaria-logregs-cv',
             data_setup=data_id,
             model_setup=model_id,
-            exp_function=fit_logregs,
+            exp_function=fit,
         )
         metainfo.update((
             ('num_cv_folds', num_cv_folds),
@@ -431,7 +431,7 @@ def cl():
 
 if __name__ == '__main__':
     parser = argh.ArghParser()
-    parser.add_commands([cl, fit_logregs])
+    parser.add_commands([cl, fit])
     parser.dispatch()
 
 # TODO: bring back from oscail configurable to model (urgent!) and eval (unnecessary, but good for consistency)
