@@ -92,21 +92,61 @@ def explain_circular_substructure(mol,
                                     allBondsExplicit=all_bonds_explicit)
 
 
-def unfolded_fingerprint(mol, max_radius=100, fcfp=False):
+def morgan_fingerprint(mol,
+                       max_radius=100,
+                       fcfp=False,
+                       use_chirality=False,
+                       use_bond_types=True):
+    """
+    Computes morgan fingerprints for a molecule.
+
+    Returns also bit explanations and enables flexible hashing and folding in python land.
+
+    Parameters
+    ----------
+    mol : rdkit.Mol or smiles string
+      The molecule.
+
+    max_radius : int
+      The maximum radius go take into account.
+
+    fcfp : bool, default False
+      Build ECFP-like (False) of FCFP-like descriptors.
+
+    use_chirality : bool, default False
+      If True, stereoisomers generate different features.
+
+    use_bond_types : bool, default True
+      If True, bonding information is taken into account.
+
+    Returns
+    -------
+    A dictionary {cansmi: [(center, radius, bit_key)]+}, where:
+      - cansmi are the canonical smiles of the substructure
+        (note that we lose context that might be used when generating bit_key)
+      - center is the atom id where the feature is centered at
+      - radius is the depth of the wide-first search used to span the feature
+      - bit_key is the hash assigned by rdkit to the substructure/feature
+        (should have little to no collisions)
+    """
     if isinstance(mol, string_types):
-        mol = to_rdkit_mol(mol)  # TODO: check it is an rdkit mol otherwise
+        mol = to_rdkit_mol(mol)
     fpsinfo = {}
     # N.B. We won't actually use rdkit hash, so we won't ask for nonzero values...
     # Is there a way of asking rdkit to give us this directly?
-    AllChem.GetMorganFingerprint(mol, max_radius, bitInfo=fpsinfo, useFeatures=fcfp)
-    counts = defaultdict(int)
-    centers = defaultdict(list)
-    for bit_descs in fpsinfo.values():
+    _ = AllChem.GetMorganFingerprint(mol,
+                                     max_radius,
+                                     bitInfo=fpsinfo,
+                                     useFeatures=fcfp,
+                                     useChirality=use_chirality,
+                                     useBondTypes=use_bond_types)
+    smi2centers = defaultdict(list)  # {smiles: [(atom_center_id, radius, bit)]}
+
+    for bit_key, bit_descs in fpsinfo.items():
         for center, radius in bit_descs:
             cansmiles = explain_circular_substructure(mol, center, radius)
-            counts[cansmiles] += 1
-            centers[cansmiles].append((center, radius))
-    return counts, centers
+            smi2centers[cansmiles].append((center, radius, bit_key))
+    return smi2centers
 
 
 ##################################################
