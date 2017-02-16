@@ -369,10 +369,10 @@ def compute_submissions(prefix,
 #########
 
 # noinspection PyTypeChecker
-def final_merged_submissions(calibrate=False,
-                             select_top_scr=None,
-                             with_bug=False,
-                             dest_dir=MALARIA_EXPS_ROOT):
+def merge_submissions(calibrate=False,
+                      select_top_scr=None,
+                      with_bug=False,
+                      dest_dir=MALARIA_EXPS_ROOT):
     """Very ad-hoc merge of submissions obtained with trees and logistic regressors."""
 
     #####
@@ -497,5 +497,5 @@ def final_merged_submissions(calibrate=False,
 if __name__ == '__main__':
     import argh
     parser = argh.ArghParser()
-    parser.add_commands([final_merged_submissions])
+    parser.add_commands([merge_submissions])
     parser.dispatch()
