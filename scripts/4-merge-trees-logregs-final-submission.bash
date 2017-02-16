@@ -8,4 +8,4 @@ of the predictions computed in steps 2c (submissions based on trees + rdkit feat
 This should take just a few minutes... and we are done with the challenge!
 "
 
-PYTHONUNBUFFERED=1 cc-malaria logregs blending merge-submissions
+PYTHONUNBUFFERED=1 ccl-malaria blending merge-submissions

@@ -13,4 +13,4 @@ It is important to note that in no case we use predictions on any molecule that 
 "
 
 # L1-regularized models for submission
-PYTHONUNBUFFERED=1 cc-malaria logregs submit
+PYTHONUNBUFFERED=1 ccl-malaria logregs submit
