@@ -296,7 +296,7 @@ def sha_for_cl(cl):
     return hashlib.sha256(params).hexdigest()
 
 
-def cl():
+def cl(with_time=False):
     """Generate command lines for different experiments."""
 
     all_commands = []
@@ -321,16 +321,19 @@ def cl():
             params = (
                 '--num-cv-folds %d' % num_folds,
                 '--cv-seeds %s' % ' '.join(map(str, cv_seeds)),
-                '--logreg-penalty %s' % penalty,
-                '--logreg-C %g' % C,
-                '--logreg-class-weight-auto' if class_auto else None,
-                '--logreg-tol %g' % tol,
-                '--logreg-dual' if dual else None,
+                '--penalty %s' % penalty,
+                '--C %g' % C,
+                '--class-weight-auto' if class_auto else None,
+                '--tol %g' % tol,
+                '--dual' if dual else None,
                 '--fingerprint-fold-size %d' % ff_size,
                 '--fingerprint-folder-seed %d' % ff_seed
             )
             params = ' '.join(filter(lambda x: x is not None, params))
-            cl = 'PYTHONPATH=.:$PYTHONPATH /usr/bin/time -v python2 -u malaria/logregs_fit.py fit-logregs '
+            cl = 'PYTHONUNBUFFERED=1 '
+            if with_time:
+                cl += '/usr/bin/time -v '
+            cl += 'ccl-malaria logregs fit '
             cl += params
             cl += ' &>~/logreg-%s.log' % hashlib.sha256(params).hexdigest()
             all_commands.append(cl)
