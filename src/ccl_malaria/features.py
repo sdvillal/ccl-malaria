@@ -100,9 +100,12 @@ def _molidsmiles_it(start=0, step=46, mols=None, processor=None, log_each=500):
     """
     if mols is None:
         mols = read_smiles_ultraiterator()  # This could benefit quite a bit of async IO
+    t0 = time.time()
     for molindex, (molid, smiles) in enumerate(islice(mols, start, None, step)):
         if log_each > 0 and molindex > 0 and not molindex % log_each:
-            info('Molecule %d' % molindex)
+            taken = time.time() - t0
+            info('Molecule %d (%.2fs, %.2fmols/s)' %
+                 (molindex, taken, molindex / taken))
         processor(molid, smiles)
     processor(_END_MOLID, None)
 
@@ -159,7 +162,7 @@ def _rdkfeats_writer(output_file=None, features=None):
     nf = len(fnames)
     descs = h5.create_dataset('rdkdescs', (0, nf), maxshape=(None, nf), compression='lzf')
     str_type = h5py.new_vlen(str)
-    h5.create_dataset('fnames', data=fnames)
+    h5.create_dataset('fnames', data=[n.encode("ascii", "ignore") for n in fnames])
     molids = h5.create_dataset('molids', shape=(0,), maxshape=(None,), dtype=str_type)
 
     def process(molid, smiles):
@@ -180,7 +183,7 @@ def _rdkfeats_writer(output_file=None, features=None):
     return process
 
 
-def rdkfs(start=0, step=46, mols='all', output_file=None):
+def rdkfs(start=0, step=1, mols='all', output_file=None):
     """Entry point for the command line to generate rdkit descriptors.
     Parameters:
       - start: the index of the first molecule to consider
@@ -199,6 +202,20 @@ def rdkfs(start=0, step=46, mols='all', output_file=None):
     _molidsmiles_it(start=start, step=step,
                     mols=mols,
                     processor=_rdkfeats_writer(output_file))
+
+
+def rdkfs_mp(num_jobs=1, mols='all', dest_dir=None):
+    if dest_dir is None:
+        dest_dir = ensure_dir(MALARIA_DATA_ROOT, 'rdkit', 'rdkfs', 'from_workers')
+    Parallel(n_jobs=num_jobs)(
+        delayed(rdkfs)
+        (start=start, step=num_jobs,
+         mols=mols,
+         output_file=op.join(dest_dir, 'rdkfs__%s__start=%d__step=%d.h5' % (
+             mols, start, num_jobs
+         )))
+        for start in range(num_jobs)
+    )
 
 
 # noinspection PyAbstractClass
@@ -223,8 +240,8 @@ class MalariaRDKFsExampleSet(ExampleSet):
         if self._molids is None or self._X is None or self._y is None:
             with h5py.File(self._h5) as h5:
                 X = h5['rdkdescs'][:]
-                molids = h5['molids'][:]
-                fnames = h5['fnames'][:]
+                molids = h5['molids'][()].astype(str)
+                fnames = h5['fnames'][()].astype(str)
                 y = MalariaCatalog().labels(molids, as01=True, asnp=True)
                 if self.dset == 'amb':
                     rows_with_label = np.isnan(y)  # Dirty hack
@@ -263,6 +280,7 @@ class MalariaRDKFsExampleSet(ExampleSet):
         return self._y
 
     def fnames(self):
+        self._populate()
         return self._fnames
 
     def ne_stream(self):
@@ -1143,5 +1161,5 @@ def cl(step=46, for_what='rdkf'):
 if __name__ == '__main__':
 
     parser = argh.ArghParser()
-    parser.add_commands([cl, morgan, morgan_mp, munge_morgan, rdkfs])
+    parser.add_commands([cl, morgan, morgan_mp, munge_morgan, rdkfs, rdkfs_mp])
     parser.dispatch()
