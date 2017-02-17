@@ -14,11 +14,12 @@ def main():
 
     # Generate features
     def add_featurizer_commands():
-        from ccl_malaria.features import cl, morgan, morgan_mp, munge_morgan, rdkfs
+        from ccl_malaria.features import cl, morgan, morgan_mp, munge_morgan, rdkfs, rdkfs_mp
         parser.add_commands([morgan,
                              morgan_mp,
                              munge_morgan,
                              rdkfs,
+                             rdkfs_mp,
                              cl],
                             namespace='features')
     add_featurizer_commands()
