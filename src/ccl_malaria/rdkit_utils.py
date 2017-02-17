@@ -4,7 +4,7 @@ from __future__ import print_function, division
 from future.utils import string_types
 from collections import Iterable
 from rdkit import Chem
-from rdkit.Chem import Descriptors, AllChem
+from rdkit.Chem import Descriptors, AllChem, Descriptors3D
 import numpy as np
 from rdkit.Chem.PropertyMol import PropertyMol
 from ccl_malaria import warning
@@ -20,10 +20,19 @@ from collections import defaultdict
 ##################################################
 
 
-def discover_rdk_descriptors(verbose=False):
+def discover_rdk_descriptors(verbose=False, no_3D=True, ignores=None):
     """Returns a list of the names descriptors (other than fps, ultrashape and possibly others) present in RDKIT."""
-    # noinspection PyProtectedMember
-    descriptors = tuple([desc_name for desc_name, func in Descriptors._descList])
+    if ignores is None:
+        ignores = set()
+
+    # noinspection PyUnresolvedReferences
+    descriptors = tuple(desc_name
+                        for desc_name, func in Descriptors.descList
+                        if desc_name not in ignores)
+    if no_3D:
+        descriptors = tuple(desc_name for desc_name in descriptors
+                            if not hasattr(Descriptors3D, desc_name))
+
     if verbose:
         print('Discovered RDKIT descriptors...')
         print('\n'.join(descriptors))
