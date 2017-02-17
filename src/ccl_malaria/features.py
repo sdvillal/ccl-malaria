@@ -453,7 +453,7 @@ def _molidsmiles_it_ecfp(output_file, start=0, step=46,
 
 
 def morgan_mp(num_jobs=1, dest_dir=None,
-              write_centers=True, write_radius=True, write_bit_keys=True,
+              no_write_centers=False, no_write_radius=True, no_write_bit_keys=True,
               no_ecfps=False,
               no_fcfps=False,
               log_each=5000):
@@ -474,9 +474,9 @@ def morgan_mp(num_jobs=1, dest_dir=None,
                                output_file=op.join(dest_dir, 'all__fcfp=%r__start=%d__step=%d.weirdfps.gz' %
                                                    (fcfp, start, num_jobs)),
                                fcfp=fcfp,
-                               write_centers=write_centers,
-                               write_radius=write_radius,
-                               write_bit_keys=write_bit_keys,
+                               write_centers=not no_write_centers,
+                               write_radius=not no_write_radius,
+                               write_bit_keys=not no_write_bit_keys,
                                log_each=log_each)
                               for start, fcfp in product(range(num_jobs), invariants))
 
