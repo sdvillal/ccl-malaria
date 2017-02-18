@@ -12,11 +12,12 @@ from collections import defaultdict
 from itertools import islice, product, chain
 import gzip
 import os
+import argh
 
 import h5py
 from joblib import Parallel, delayed
 import numpy as np
-import argh
+import pandas as pd
 from scipy.sparse import coo_matrix, csr_matrix, vstack
 from sklearn.utils.murmurhash import murmurhash3_32 as murmur
 
@@ -218,6 +219,93 @@ def rdkfs_mp(num_jobs=1, mols='all', dest_dir=None):
     )
 
 
+def _h52pandas(h5_path):
+    """
+    Returns a pandas dataframe with all the data in the hdf5 file.
+    Columns are features and molids are in the index.
+    """
+    with h5py.File(h5_path, mode='r') as h5:
+        return pd.DataFrame(
+            data=h5['rdkdescs'][()],
+            columns=h5['fnames'][()].astype(str),
+            index=h5['molids'][()].astype(str)
+        )
+
+
+def _h5s(src_dir=None, num_jobs=28, mol_set_id='all', strict=False):
+    if src_dir is None:
+        src_dir = op.join(MALARIA_DATA_ROOT, 'rdkit', 'rdkfs', 'from_workers')
+    h5s = []
+    missing = []
+    for i in range(num_jobs):
+        h5src = op.join(src_dir,
+                        'rdkfs__%s__start=%d__step=%d.h5' % (mol_set_id, i, num_jobs))
+        if strict and not op.isfile(h5src):
+            missing.append(h5src)
+        h5s.append(h5src)
+    if strict and missing:
+        raise Exception('Missing the results from some workers (%r)' % missing)
+    return h5s
+
+
+def merge_rdkfs(src_dir=None, num_jobs=28, src_mol_set_id='all',  # coordinates of inputs
+                strict=True,
+                dest_dir=op.join(MALARIA_DATA_ROOT, 'rdkit', 'rdkfs'),
+                **dest_mol_sets):
+
+    # This does not stream copy, but for simplicity holds everything in memory
+    # Will use ~16GB RAM for the screening dataset
+
+    if not dest_mol_sets:
+        dest_mol_sets[src_mol_set_id] = None
+
+    # Merge everything (in memory, takes at most total + 1 temporary space)
+    dfs = {}
+    info('Merging hdf5 files')
+    for h5 in _h5s(src_dir=src_dir,
+                   num_jobs=num_jobs,
+                   mol_set_id=src_mol_set_id,
+                   strict=strict):
+        df = _h52pandas(h5)
+        for dset, molids in dest_mol_sets.items():
+            # Get the subset of molecules in this dataframe
+            if molids is not None:
+                molids = df.index.intersection([molids])
+            else:
+                molids = df.index
+            if dset not in dfs:
+                dfs[dset] = df.loc[molids]
+            else:
+                dfs[dset] = dfs[dset].append(df.loc[molids])
+
+    # Respect requested molecule order
+    def reorder(dset):
+        if dest_mol_sets[dset] is None:
+            return dfs[dset]
+        return dfs[dset].loc[dest_mol_sets[dset]].copy()
+    info('Reordering dataframes')
+    dfs = {dset: reorder(dset) for dset in dfs}
+
+    # Store back (if requested, for compatibility with rushy competition code)
+    if dest_dir is not None:
+        info('Saving back to clumsy competition format')
+        dest_dir = ensure_dir(dest_dir)
+        for dset, df in dfs.items():
+            dest_file = op.join(dest_dir, '%srdkfs.h5' % dset)
+            with h5py.File(dest_file, mode='w', dtype=np.float32) as h5:
+                h5.create_dataset('fnames', data=[n.encode("ascii", "ignore") for n in df.columns])
+                h5.create_dataset('molids', data=[n.encode("ascii", "ignore") for n in df.index])
+                h5.create_dataset('rdkdescs', data=df.values, compression='lzf')
+
+    # Return
+    return dfs
+
+
+def munge_rdkfs():
+    from ccl_malaria.molscatalog import lab_molids, unl_molids, scr_molids
+    merge_rdkfs(lab=lab_molids(), unl=unl_molids(), scr=scr_molids())
+
+
 # noinspection PyAbstractClass
 class MalariaRDKFsExampleSet(ExampleSet):
 
@@ -297,9 +385,13 @@ class MalariaRDKFsExampleSet(ExampleSet):
             h5 = h5py.File(self._h5)['rdkdescs']
             for start in range(0, self.ne_stream(), chunksize):
                 yield h5[start:start+chunksize]
-                # FIXME: bug, do not skip some of the molecules that need to be skipped,
+                # FIXME: bug, does not skip some of the molecules that need to be skipped,
                 # remove ambiguous and nans
             h5.close()
+    # FIXME: streaming is clunky and error prone for lab / amb, base on molids
+
+    def df(self):
+        return _h52pandas(self._h5)
 
 
 ##################################################
@@ -1161,5 +1253,5 @@ def cl(step=46, for_what='rdkf'):
 if __name__ == '__main__':
 
     parser = argh.ArghParser()
-    parser.add_commands([cl, morgan, morgan_mp, munge_morgan, rdkfs, rdkfs_mp])
+    parser.add_commands([cl, morgan, morgan_mp, munge_morgan, rdkfs, rdkfs_mp, munge_rdkfs])
     parser.dispatch()
