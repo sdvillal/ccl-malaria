@@ -151,7 +151,9 @@ def trees_y():
 
 def submit(no_confirmatory=False,
            no_heldout=False,
-           no_screening=False):
+           no_screening=False,
+           confirmatory_top=500,
+           scr_top=1000):
     compute_submissions(prefix='trees',
                         dest_dir=MALARIA_TREES_EXPERIMENT_ROOT,
                         deployers=trees_deployers,
@@ -159,7 +161,9 @@ def submit(no_confirmatory=False,
                         y_provider=trees_y,
                         do_confirmatory=not no_confirmatory,
                         do_heldout=not no_heldout,
-                        do_screening=not no_screening)
+                        do_screening=not no_screening,
+                        confirmatory_top=confirmatory_top,
+                        scr_top=scr_top)
     info('Submissions computed!')
 
 
