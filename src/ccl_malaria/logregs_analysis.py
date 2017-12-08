@@ -80,7 +80,7 @@ def clean_results_pre_infojson_bug_fix():
 # noinspection PyUnresolvedReferences
 def logreg_experiments_to_deploy():
     """
-    Returns a pandas dataframe with a selection of the logistic regression 
+    Returns a pandas dataframe with a selection of the logistic regression
     experiments to be included on deployment.
     """
 
@@ -134,17 +134,17 @@ def malaria_logreg_deployers_file(with_bug=False):
 def logreg_deploy(dest_file=None, with_bug=False):
     """
     Generates predictions for the competition unlabelled datasets, saving them in HDF5 files.
-    
+
     Generates one prediction per molecule and cross-validation experiment:
-    
-      - For the labelled set, the prediction is given by the model of the 
+
+      - For the labelled set, the prediction is given by the model of the
         run where the molecule was in the testing set.
-        
+
       - For the other sets, the predictions are averages of all the models
         built during cross-validation. Note that at the time of submitting
         there was a bug that made these predictions be just the one of the
         last fold (see `with_bug` parameter).
-    
+
 
     Parameters
     ----------
@@ -156,18 +156,18 @@ def logreg_deploy(dest_file=None, with_bug=False):
         - amb: predictions on the ambiguously labelled compounds
         - unl: predictions in the held-out competition set
         - scr: predictions in the screening dataset
-    
+
     with_bug : bool, default False
-      If True, predictions will be generated as for the competion 
+      If True, predictions will be generated as for the competion
       (taking only the last fold of each experiment into account).
       If False, predictions will be generated as initially intended
       (averaging all the folds for each experiment).
       This bug does not affect the labelled scores.
-      
+
     Returns
     -------
     The path to the HDF5 file where the scores have been saved.
-      
+
     Side effects
     ------------
     The HDF5 file is created
@@ -269,6 +269,7 @@ def submit(no_confirmatory=False,
 
 
 if __name__ == '__main__':
+
     import argh
     parser = argh.ArghParser()
     parser.add_commands([submit])
