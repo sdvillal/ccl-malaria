@@ -15,6 +15,7 @@ from sklearn.metrics import roc_auc_score
 from ccl_malaria import info, MALARIA_EXPS_ROOT
 from ccl_malaria.molscatalog import MalariaCatalog
 from minioscail.common.eval import kendalltau, rank_sort
+from minioscail.common.misc import ensure_dir
 from minioscail.common.results import OOBResult, ResultInDisk
 
 
@@ -385,6 +386,8 @@ def merge_submissions(calibrate=False,
     from ccl_malaria.trees_fit import MALARIA_TREES_EXPERIMENT_ROOT
 
     mc = MalariaCatalog()
+
+    ensure_dir(dest_dir)
 
     def save_submission(sub, outfile, select_top=500):
         # Get the smiles
