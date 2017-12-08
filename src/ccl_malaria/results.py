@@ -1,4 +1,6 @@
 # coding=utf-8
+from __future__ import division
+from itertools import product
 import json
 import os.path as op
 from glob import glob
@@ -497,8 +499,23 @@ def merge_submissions(calibrate=False,
     # read the code to understand what I mean
 
 
+def compute_all_submissions(dest_dir='~/tdt-final-submissions-all'):
+    """Computes submissions for all compounds, generating large CSV files."""
+
+    dest_dir = op.expanduser(dest_dir)
+
+    calibrates = [False, True]
+    with_bug = [True, False]
+
+    for calibrate, with_bug in product(calibrates, with_bug):
+        merge_submissions(calibrate=calibrate, with_bug=with_bug,
+                          select_top_scr=None,
+                          dest_dir=op.join(dest_dir, 'with_bug=%r' % with_bug, 'calibrated=%r' % calibrate))
+
+
 if __name__ == '__main__':
+
     import argh
     parser = argh.ArghParser()
-    parser.add_commands([merge_submissions])
+    parser.add_commands([merge_submissions, compute_all_submissions])
     parser.dispatch()
