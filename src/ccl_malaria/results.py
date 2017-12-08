@@ -493,13 +493,20 @@ def merge_submissions(calibrate=False,
     stacker = LinearRegression()
     stacker.fit(lab[['trees', 'logregs']], lab['labels'])
 
+    def robust_predict(X):
+        X = np.asarray(X)
+        row_is_finite = np.all(np.isfinite(X), axis=1)
+        scores = np.full(len(X), fill_value=np.nan)
+        scores[row_is_finite] = stacker.predict(X[row_is_finite])
+        return scores
+
     # noinspection PyArgumentList
-    submission_unl_st = Series(data=stacker.predict(unl[['trees', 'logregs']]), index=unl.index)
+    submission_unl_st = Series(data=robust_predict(unl[['trees', 'logregs']]), index=unl.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-unl.csv' % submission_options)
     save_submission(submission_unl_st, outfile, select_top=None)
 
     # noinspection PyArgumentList
-    submission_scr_st = Series(data=stacker.predict(scr[['trees', 'logregs']]), index=scr.index)
+    submission_scr_st = Series(data=robust_predict(scr[['trees', 'logregs']]), index=scr.index)
     outfile = op.join(dest_dir, 'final-%s-stacker=linr-scr.csv' % submission_options)
     save_submission(submission_scr_st, outfile, select_top=select_top_scr)
 
