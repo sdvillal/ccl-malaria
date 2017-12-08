@@ -39,8 +39,11 @@ def _screening_smiles_file():
     # Original was:
     #   http://downloads.emolecules.com/ordersc/2014-01-01/parent.smi.gz
     # Current is:
-    #   http://downloads.emolecules.com/free/2017-02-01/version.smi.gz
+    #   http://downloads.emolecules.com/free/2017-12-01/version.smi.gz
     # Current misses some molecules from the original, and has many new ones...
+    # See:
+    #   https://www.emolecules.com/info/products-data-downloads.html
+    #   http://downloads.emolecules.com/free/
     #
 
     # Try first good old 2014 version (we should upload somewhere)
@@ -49,12 +52,12 @@ def _screening_smiles_file():
                         op.join(MALARIA_ORIGINAL_DATA_ROOT, '20140101-parent.smi.gz'),
                         info=info,
                         sha256='d933c51f5a1542b1f89f006747d2ab65cda495709e0d7aaf5e115ae8ef785036')
-    except:  # Too broad
+    except Exception:
         # Of course, that is a different one... still, lets use it.
-        return download('http://downloads.emolecules.com/free/2017-02-01/version.smi.gz',
-                        op.join(MALARIA_ORIGINAL_DATA_ROOT, '20170202-emolecules.smi.gz'),
+        return download('http://downloads.emolecules.com/free/2017-12-01/version.smi.gz',
+                        op.join(MALARIA_ORIGINAL_DATA_ROOT, '20171201-emolecules.smi.gz'),
                         info=info,
-                        sha256='9137110fbbfa10a60e5736db7670937ba6e92428d169b6fafd7d77ba6729401d')
+                        sha256='4e83f04c96b3534e8016b345d77b54c89944962622d4557226cdd73761457b2f')
 
 
 # ---Data in, relabelling
