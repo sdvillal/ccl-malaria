@@ -442,11 +442,21 @@ def merge_submissions(calibrate=False,
         calibrator = IsotonicRegression(y_min=0, y_max=1)
         x = lab[~np.isnan(lab[col])][col].values
         y = lab[~np.isnan(lab[col])]['labels'].values
-        calibrator.fit(x.reshape(-1, 1), y)
-        lab[col] = calibrator.predict(lab[col].values.reshape(-1, 1))
-        amb[col] = calibrator.predict(amb[col].values.reshape(-1, 1))
-        unl[col] = calibrator.predict(unl[col].values.reshape(-1, 1))
-        scr[col] = calibrator.predict(scr[col].values.reshape(-1, 1))
+        # This worked with old sklearn
+        try:
+            # Old sklearn
+            calibrator.fit(x.reshape(-1, 1), y)
+            lab[col] = calibrator.predict(lab[col].values.reshape(-1, 1))
+            amb[col] = calibrator.predict(amb[col].values.reshape(-1, 1))
+            unl[col] = calibrator.predict(unl[col].values.reshape(-1, 1))
+            scr[col] = calibrator.predict(scr[col].values.reshape(-1, 1))
+        except ValueError:
+            # Newer sklearn
+            calibrator.fit(x.ravel(), y)
+            lab[col] = calibrator.predict(lab[col].values.ravel())
+            amb[col] = calibrator.predict(amb[col].values.ravel())
+            unl[col] = calibrator.predict(unl[col].values.ravel())
+            scr[col] = calibrator.predict(scr[col].values.ravel())
 
     if calibrate:
         calibrate_col('trees')
