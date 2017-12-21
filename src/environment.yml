@@ -14,6 +14,9 @@ dependencies:
   - cython
   - rdkit
   - argh
+  - natsort
+  - tinyarray
+  - feather-format
   # so we can run notebooks
   - jupyter
   - matplotlib
