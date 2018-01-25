@@ -1,15 +1,15 @@
 # coding=utf-8
 """Feature generation and munging."""
 from __future__ import print_function, division
+from future.utils import string_types
 
 import time
-from future.utils import string_types
 from array import array
 from glob import glob
 from operator import itemgetter
 import os.path as op
 from collections import defaultdict
-from itertools import islice, product, chain
+from itertools import islice, product, chain, zip_longest
 import gzip
 import os
 import argh
@@ -18,6 +18,7 @@ import h5py
 from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
+from natsort import natsorted
 from scipy.sparse import coo_matrix, csr_matrix, vstack
 from sklearn.utils.murmurhash import murmurhash3_32 as murmur
 
@@ -86,7 +87,7 @@ class ExampleSet(Configurable):
 ##################################################
 
 
-_END_MOLID = None  # Marker for end of iteration.
+_END_MOLID = None  # Marker for end of iteration
 
 
 def _molidsmiles_it(start=0, step=46, mols=None, processor=None, log_each=500):
@@ -177,8 +178,8 @@ def _rdkfeats_writer(output_file=None, features=None):
             mol = to_rdkit_mol(smiles)
             descs.resize((ne + 1, nf))
             descs[ne, :] = computer.compute(mol)[0]
-        except:
-            info('Failed molecule %s: %s' % (molid, smiles))
+        except Exception as ex:
+            info('Failed molecule %s: %s (%s)' % (molid, smiles, str(ex)))
             descs[ne, :] = [np.nan] * nf
 
     return process
@@ -403,7 +404,8 @@ _MALARIA_ECFPS_PARALLEL_RESULTS_DIR = op.join(_MALARIA_ECFPS_DIR, 'from_workers'
 
 
 def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
-                 write_centers=True, write_radius=True, write_bit_keys=True):
+                 write_centers=True, write_radius=True, write_bit_keys=True,
+                 write_error_msgs=False):
     """
     Returns a (molid, smiles) processor that computes ecfps on the smiles and stores them in a text file.
 
@@ -427,8 +429,11 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
     write_radius : bool, default True
       whether to also save all the radius generating each substructure or not.
 
-    writ_bit_keys : bool, default True
+    write_bit_keys : bool, default True
       whether to also save all the corresponding rdkit hash for each feature or not.
+
+    write_error_msgs : bool, default False
+      whether to write also error messages to the file
 
     Returns:
       - a processor function ready to be used as a parameter to `_molidsmiles_it`.
@@ -436,12 +441,13 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
 
     File format
     -----------
-
     We call the format generated "weird fp format".
+    The file starts with a header like this:
+      v1\t[|C|R|K|CR|CK|RK|CRK]
     For each molecule for which fingerprinting works we have a line like this:
-        \tv1\t[|C|R|K|CR|CK|RK|CRK]\tmolid[\tcansmi count [center radius hash]+]+
+      molid\t[cansmi count [center radius hash]+\t]+\n
       For example:
-        '\tv1\tCRK\tmol1\tC 4 1 1 33 2 1 33\tB 1 1 1 22\tBC 1 1 2 1789'
+        'v1\tCRK\tmol1\tC 4 1 1 33 2 1 33\tB 1 1 1 22\tBC 1 1 2 1789\n'
       Parses to:
         - v1: version tag of the format
         - CRK: for each feature we additionally store C=Center, R=Radius, K=bit Key
@@ -453,23 +459,13 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
         - BC 1 1 2 1789: feature explained by smiles BC appears once at atom 1, radius 2,
                          hashes to 1789.
     If there is an error with the molecule, a line like this is written:
-        molid\t*FAILED*\tErrorMessage
+        FAIL\tmolid\n
+    Optionally, error lines can end with the error message
+        FAIL\tmolid\tCannot kekulize mol\n
 
     Note that parsing this format is quite consuming, so munge this information
     into more efficient formats for reading, specially if (a subset of) it is to
     be read repeatly.
-
-    Legacy file format
-    ------------------
-
-    The legacy, competition version "the weird fp format" looked like this
-    We call the format generated "weird fp format". On each line we have either:
-        molid[\tcansmi count [center radius]+]+
-    or, if there is an error with the molecule:
-        molindex\molid\t*FAILED*
-    It can be detected because the line does not start by a tab. Remove that ugly
-    tab when the competition data is not relevant anymore (or just rewrite that data
-    into the new format).
     """
     writer = gzip.open(output_file, 'wt')
 
@@ -477,14 +473,14 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
         if molid is _END_MOLID:
             writer.close()
             return
+        extra_info = '%s%s%s' % ('C' if write_centers else '',
+                                 'R' if write_radius else '',
+                                 'K' if write_bit_keys else '')
+        header = 'v1\t%s\t%s' % (extra_info, molid)
         try:
             cansmi2fptinfo = morgan_fingerprint(smiles,
                                                 max_radius=max_radius,
                                                 fcfp=fcfp)
-            extra_info = '%s%s%s' % ('C' if write_centers else '',
-                                     'R' if write_radius else '',
-                                     'K' if write_bit_keys else '')
-            header = '\tv1\t%s\t%s' % (extra_info, molid)
             features_strings = []
             for cansmiles, feature_info in cansmi2fptinfo.items():
                 feature_string = '%s %d' % (cansmiles, len(feature_info))
@@ -502,8 +498,258 @@ def _ecfp_writer(output_file=None, max_radius=200, fcfp=False,
             writer.write('%s %s\n' % (header, '\t'.join(features_strings)))
         except Exception as ex:
             info('Failed molecule %s: %s; exception: %s' % (molid, smiles, str(ex)))
-            writer.write('%s\t*FAILED*\t%s\n' % (molid, str(ex)))
+            if write_error_msgs:
+                writer.write('FAIL\t%s\t%s\n' % (header, str(ex).replace('\n', ' => ')))
+            writer.write('FAIL\t%s\n' % header)
     return process
+
+
+def parse_weirdfpt_v1_line(line, check_dumb_tab=False):
+    # Check for error line
+    if 'FAILED' in line:
+        molid, _, reason = line.strip().split('\t')
+        return molid, None
+    # Dumb workaround to broken lines due to exceptions containing newlines
+    # This is already fixed in the writer
+    if not line.startswith('\t'):
+        return None, None
+    # Check for starting tab
+    if check_dumb_tab and not line.startswith('\t') and len(line.strip()) > 0:
+        # This dumb tab can be removed when we convert competition data to the new format
+        # or do not care anymore about the TDT competition data.
+        raise ValueError('At the moment, line should start with an spurious tab (%r)' % line)
+    # Split
+    line = line.strip()
+    # Header + molid
+    version, extra_info, rest = line.split('\t', 2)
+    # Check version
+    if version != 'v1':
+        raise ValueError('Wrong format version: %r' % version)
+    molid, rest = rest.split(' ', 1)
+
+    # --- Parse features
+    if True:
+        # Check extra info description
+        valid_extra_infos = {'', 'C', 'R', 'K', 'CR', 'CK', 'RK', 'CRK'}  # partition set of {'', 'C', 'R', 'K'}
+        if extra_info not in valid_extra_infos:
+            raise ValueError('Wrong extra info spec %r, must be one of %r' % (extra_info, valid_extra_infos))
+        extra_info = [{'C': 'center', 'R': 'radius', 'K': 'rdkit_hash'}[ei]
+                      for ei in extra_info]
+        parsed_features = []
+        while rest:
+            s = rest.split('\t', 1)
+            feature, rest = s if len(s) == 2 else (s[0], '')
+            ffields = feature.split()
+            cansmi = ffields[0]
+            count = int(ffields[1])
+            feature = dict(
+                cansmi=cansmi,
+                count=count,
+            )
+            centers = ffields[2:]
+            if (0 == len(centers) and extra_info) or len(centers) % len(extra_info) != 0:
+                raise ValueError('Corrupt extra info for molecule %s, feature %r' % (molid, cansmi))
+            # feature['infos'] = ta.array([int(c) for c in centers])
+            feature['infos'] = array.array('I', [int(c) for c in centers])
+            parsed_features.append(feature)
+
+        return molid, parsed_features
+    return molid
+
+# OF COURSE THIS IS EXPLOSION AND WE ANYWAY HAVE THIS IN THE MOLECULE
+# IS RDKIT ALL INT32?
+
+
+def _grouper(iterable, n, fill_value=None):
+    """Collect data into fixed-length chunks or blocks"""
+    # https://docs.python.org/3/library/itertools.html
+    #   _grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    # like `partition` in (cy)toolz
+    # see also `partition_all` (a tad faster in cytoolz)
+    args = [iter(iterable)] * n
+    return zip_longest(*args, fillvalue=fill_value)
+
+
+def ext_based_open(path, mode='rt'):
+    if path.endswith('.gz'):
+        return gzip.open(path, mode=mode)
+    return open(path, mode=mode)
+
+
+class IterationSignal:
+    def __init__(self, name):
+        self.name = name
+
+
+IGNORE_RESULT = IterationSignal('IGNORE_RESULT')
+END_FILE = IterationSignal('END_FILE')
+END_ALL = IterationSignal('END_ALL')
+
+
+def wfpts_files(src_dir=None):
+    if src_dir is None:
+        src_dir = op.join(_MALARIA_ECFPS_PARALLEL_RESULTS_DIR)
+    return natsorted(glob(op.join(src_dir, '*.weirdfps.gz')))
+
+
+def line_iterator(visitor,
+                  file_paths=None,
+                  file_start=0, file_step=1,
+                  line_start=0, line_step=1):
+    if file_paths is None:
+        file_paths = wfpts_files()
+    for file_path in islice(file_paths, file_start, None, file_step):
+        with ext_based_open(file_path, 'rt') as reader:
+            line_iterator = islice(reader, line_start, None, line_step)
+            for line in line_iterator:
+                result = visitor(line)
+                if result is IGNORE_RESULT:
+                    continue
+                elif result is END_FILE:
+                    yield result
+                    break
+                elif result is END_ALL:
+                    yield result
+                    return
+                else:
+                    yield result
+
+
+def identity(x):
+    return x
+
+
+def up_to_n(visitor, n=1000):
+    # noinspection PyDefaultArgument
+    def up_to(x, counter=[0]):
+        if counter[0] == n:
+            return END_ALL
+        counter[0] += 1
+        return visitor(x)
+    return up_to
+
+
+def sharded_parse(x, shard=0, num_shards=127):
+    molid, feats = parse_weirdfpt_v1_line(x)
+    if murmur(molid) % num_shards == shard:
+        print('Not ignored')
+        return molid, feats
+    return IGNORE_RESULT
+
+
+def to_new(dest_dir='/home/santi/testit'):
+    ensure_dir(dest_dir)
+    fpt_writer = ext_based_open(op.join(dest_dir, 'fingerprints.bin'), 'wb')  # TODO: ensure it is closed
+    cansmi_writer = ext_based_open(op.join(dest_dir, 'features.txt'), 'wt')
+    molids_writer = ext_based_open(op.join(dest_dir, 'molids.txt'), 'wt')
+    failed_molids_writer = ext_based_open(op.join(dest_dir, 'molids_failed.txt'), 'wt')
+    h2i = {}
+
+    def to_new(x):
+        molid, features = parse_weirdfpt_v1_line(x)
+        pos = fpt_writer.tell()
+        if molid is None:
+            return  # Should not happen, but we where saving verbatim error messages with newlines
+        if features is None:
+            failed_molids_writer.write(molid + '\n')
+            return
+        array.array('I', [len(features)]).tofile(fpt_writer)
+        for feature in features:
+            cansmi = feature['cansmi']
+            count = feature['count']
+            infos = feature['infos']
+            assert len(infos) / count == 3
+            h3 = murmur(cansmi, seed=0), murmur(cansmi, seed=1), murmur(cansmi, seed=2)
+            if h3 not in h2i:
+                h2i[h3] = len(h2i)
+                cansmi_writer.write(cansmi)
+                cansmi_writer.write('\n')
+            array.array('I', [h2i[h3], count]).tofile(fpt_writer)
+            infos.tofile(fpt_writer)
+        molids_writer.write(molid + ' ' + str(pos) + '\n')  # TODO: also save position in binary file
+    return to_new
+
+
+def interpret_fpt(x):
+    nfeats = x[0]
+    base = 1
+    feats = []
+    for f in range(nfeats):
+        cansmi_hash, count = x[base:base+2]
+        occurrences = np.frombuffer(x[base+2:base+2+3*count], dtype=x.typecode).reshape(-1, 3)
+        feats.append([cansmi_hash, occurrences])
+        base = base+2+3*count
+    return feats
+
+
+def parse_new(dest_dir='/home/santi/testit'):
+    fpt = ext_based_open(op.join(dest_dir, 'fingerprints.bin'), 'rb')
+    molids = ext_based_open(op.join(dest_dir, 'molids.txt'), 'rt')
+
+    def read_one_fpt():
+        x = array.array('I')
+        x.fromfile(fpt, 1)              # number of features (redundant once read)
+        for _ in range(x[0]):
+            x.fromfile(fpt, 2)          # hash, count_in_mol
+            x.fromfile(fpt, 3 * x[-1])  # (center, radius, rdkit_hash) * count
+        return x
+
+    for _ in molids:
+        yield read_one_fpt()
+
+
+def _read_full_file(x, path):
+    """Reads the full contentes of file path into array x."""
+    with open(path, 'rb') as reader:
+        reader.seek(0, 2)
+        size = reader.tell()
+        reader.seek(0, 0)
+        if size % x.itemsize != 0:
+            raise Exception('Truncated file')
+        x.fromfile(reader, size // x.itemsize)
+        return x
+
+
+class FlyWeightDict(dict):
+    # Kinda FlyWeight pattern, without the magic on types
+    # (e.g. not defining str subclass that on construction gets the canonical / intrinsics)...
+    #   http://www.boost.org/doc/libs/1_60_0/libs/flyweight/doc/tutorial/index.html
+    # N.B. rdkit uses the pattern for Morgan fingerprinting, as implemented in boost
+    #   http://www.boost.org/doc/libs/1_60_0/libs/flyweight/doc/tutorial/index.html
+    def __getitem__(self, k):
+        try:
+            return super(FlyWeightDict, self).__getitem__(k)
+        except KeyError:
+            self[k] = k
+            return k
+
+
+def parse_wfps(start=0, step=4):
+    t0 = time.time()
+    hash2smi = defaultdict(set)  # maybe set is too much mem, usually cardinality will be very low
+    smi2hash = defaultdict(set)  # maybe set is too much mem, usually cardinality will be very low
+    smis = FlyWeightDict()    # kinda flyweight
+    hashes = FlyWeightDict()  # kinda flyweight
+    wfpts = glob(op.join(_MALARIA_ECFPS_PARALLEL_RESULTS_DIR, '*.weirdfps.gz'))
+    lines = 0
+    for wfpt in islice(wfpts, start, None, step):  # Could parallelize too at the line level...
+        info(wfpt)
+        with gzip.open(wfpt, 'rt') as reader:
+            for line in reader:
+                if lines > 0 and lines % 10000 == 0:
+                    taken = time.time() - t0
+                    info('Parsed %d lines (%.2fs, %.2fmols/s), %d features, %d hashes, %s' %
+                         (lines, taken, lines / taken, len(smis), len(hashes), wfpt))
+                molid, feats = parse_weirdfpt_v1_line(line)
+                if feats is not None:
+                    for feat in feats:
+                        cansmi = smis[feat['cansmi']]
+                        for finfo in feat['infos']:
+                            rdkit_hash = hashes[finfo['rdkit_hash']]
+                            hash2smi[rdkit_hash].add(cansmi)
+                            smi2hash[cansmi].add(rdkit_hash)
+                lines += 1
+    return hash2smi, smi2hash
 
 
 def morgan(start=0, step=46, mols='lab', output_file=None, fcfp=True):
@@ -580,8 +826,19 @@ def munge_morgan():
     #       - The order is the same as in the original file
     #       - Optionally delete the workers files
 
-    def parse_weirdfpformat_line(line):
+    def parse_weirdfpformat_legacy_line(line):
         """Returns a tuple (molid, [cansmi, count, [(center, radius)]+]+)."""
+        # Legacy file format
+        # ------------------
+        #
+        # The legacy, competition version "the weird fp format" looked like this
+        # We call the format generated "weird fp format". On each line we have either:
+        #     molid[\tcansmi count [center radius]+]+
+        # or, if there is an error with the molecule:
+        #     molindex\molid\t*FAILED*
+        # It can be detected because the line does not start by a tab. Remove that ugly
+        # tab when the competition data is not relevant anymore (or just rewrite that data
+        # into the new format).
         def _parse_weird_feature(feature):
             vals = feature.split()
             cansmi = vals[0]
@@ -683,8 +940,8 @@ def munge_morgan():
                 open(op.join(_MALARIA_ECFPS_DIR, dset + '.merged'), 'w') as writer:
             for ecfp in reader:
                 fcfp = next(reader)
-                molide, subse = parse_weirdfpformat_line(ecfp)
-                molidf, subsf = parse_weirdfpformat_line(fcfp)
+                molide, subse = parse_weirdfpformat_legacy_line(ecfp)
+                molidf, subsf = parse_weirdfpformat_legacy_line(fcfp)
                 assert molide == molidf
                 if subse is not None:
                     uniques = set((sub, count) for sub, count, _ in subse + subsf)
@@ -832,7 +1089,7 @@ def detect_duplicate_features(transductive=False, verbose=False):
     groups = defaultdict(lambda: array('I'))
     for i in range(nf):
         xi = X.indices[X.indptr[i]:X.indptr[i+1]:]
-        groups[xi.data].append(i)
+        groups[xi.data].append(i)  # We should hash xi.data to make the dictionary easier on memory
         if verbose and i > 0 and not i % 1000000:
             info('%d of %d substructures hashed according to the molecules they pertain' % (i, nf))
 
@@ -840,6 +1097,7 @@ def detect_duplicate_features(transductive=False, verbose=False):
 
 
 def zero_columns(X, columns, zero_other=False):
+    # N.B. always returns copy under current implementation
     X = X.tocsc()  # Duplicate memory!
     num_cols = X.shape[1]
     if zero_other:
