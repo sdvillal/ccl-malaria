@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 from natsort import natsorted
 from scipy.sparse import coo_matrix, csr_matrix, vstack
+from scipy.stats import rankdata
 from sklearn.utils.murmurhash import murmurhash3_32 as murmur
 
 from ccl_malaria import info
@@ -1346,43 +1347,110 @@ class MalariaFingerprintsManager(object):
         self._features = defaultdict(set)
 
 
-def fold_csr(X, folder, slow=False, binary=True, binary_as_bool=False):
+def fold_csr(X, folder, safe=True, binary=True, as_float=False):
     """A convenience method to fold a CSR sparse matrix using a folder (hashing + bucket assignment method)."""
+
     X = X.tocsr()
-    # Is there an efficient way of doing this for the whole matrix?
+    if safe:
+        X.eliminate_zeros()
+
+    #
+    # Is there a more efficient way of doing this for the whole matrix?
     # This is tempting:
     #   folded = murmur(X.indices) % fold_size
     #   X.indices = folded
     # But then the indices for each row can be non-unique and non-sorted
-    # Let's do a lot of work here...
-    if slow:
-        cols = [np.unique(folder.assign_feature(X[row, :].indices)) for row in range(X.shape[0])]  # Fold
+    #
+    # Also, just remember this is much slower
+    # if slow:
+    #     cols = [np.unique(folder.assign_feature(X[row, :].indices))
+    #             for row in range(X.shape[0])]  # Fold
+    #
+    # Let's do a lot of work here.
+    # Move maybe this implementation down to numba/cython if ever a problem,
+    # and then make it without intermediate arrays and all that heavy
+    # machinery.
+    #
+
+    # Create a COO Matrix
+    if not binary:
+        rows = []
+        cols = []
+        data = []
+        for row in range(X.shape[0]):
+            # Cols that are non-zero for the row
+            non_zero_cols = X.indices[X.indptr[row]:X.indptr[row + 1]]
+            # Hash + fold the columns
+            hashed_cols = folder.assign_feature(non_zero_cols)
+            # There might have been collisions...
+            unique_folded_cols = np.unique(hashed_cols)
+            # Coordinate collisions
+            # For folded coords like [11, 33, 11, 33, 11, 11], coords will be [0, 1, 0, 1, 0, 0]
+            folded_data_coords = rankdata(hashed_cols, method='dense') - 1
+            # Merge colliding data by summing
+            folded_data = np.bincount(folded_data_coords, weights=X.data[X.indptr[row]:X.indptr[row + 1]])
+            # We are done for this row
+            rows.append(np.full(len(unique_folded_cols), fill_value=row, dtype=np.int))
+            cols.append(unique_folded_cols)
+            data.append(folded_data.astype(X.dtype if not as_float else np.float))
+        # Merge data for all rows
+        rows = np.hstack(rows)
+        cols = np.hstack(cols)
+        data = np.hstack(data)
     else:
+        rows = []
         cols = []
         for row in range(X.shape[0]):
-            indices = X.indices[X.indptr[row]:X.indptr[row + 1]]
-            cols.append(np.unique(folder.assign_feature(indices)))
+            # Cols that are non-zero for the row
+            non_zero_cols = X.indices[X.indptr[row]:X.indptr[row + 1]]
+            # Hash + fold the columns
+            hashed_cols = folder.assign_feature(non_zero_cols)
+            # There might have been collisions...
+            unique_folded_cols = np.unique(hashed_cols)
+            rows.append(np.full(len(unique_folded_cols), fill_value=row, dtype=np.int))
+            cols.append(unique_folded_cols)
+        # Merge data for all rows
+        rows = np.hstack(rows)
+        cols = np.hstack(cols)
+        data = np.ones(len(rows), dtype=(np.float if as_float else np.bool))
 
-    def rowindices(row_num, num_cols):
-        rows = np.empty(num_cols, dtype=np.int)
-        rows.fill(row_num)
-        return rows
-    rows = np.hstack([rowindices(i, len(c)) for i, c in enumerate(cols)])
-    if binary:
-        data = np.ones(len(rows), dtype=(np.bool if binary_as_bool else np.float))
-    else:
-        raise NotImplementedError()
-    return coo_matrix((data, (rows, np.hstack(cols))), shape=(X.shape[0], folder.fold_size)).tocsr()
+    # COO -> CSR, return
+    return coo_matrix((data, (rows, cols)), shape=(X.shape[0], folder.fold_size)).tocsr()
 
 
 class MurmurFolder(Configurable):
 
-    def __init__(self, seed=0, positive=True, fold_size=1023, save_map=True):
-        """Hashes and folds substructures into features in R^d, keeping track of what goes where."""
+    def __init__(self, seed=0, positive=True, fold_size=1023,
+                 safe=True, as_binary=True, as_float=False,
+                 save_map=True):
+        """
+        Hashes and folds substructures into features in R^d, possibly keeping track of what goes where.
+        """
+
+        #
+        # TODO: allow these different modes:
+        #   - fold to target density
+        #   - fold to fixed number of bits per substructure
+        #   - fold to a mask; allow counts, binary and "binary counts"
+        #
+
+        #
+        # TODO: allow a fold_size auto mode, where the nearest prime is looked for
+        # (e.g. use lookup table for common values and a brute force approach + primality (Miller-Rabin)
+        # for values not in the lookup table)
+        #
+
+        #
+        # TODO: fold online
+        #
+
         super(MurmurFolder, self).__init__()
         self.seed = seed
         self.positive = positive
         self.fold_size = fold_size
+        self.as_binary = as_binary
+        self.as_float = as_float
+        self._safe = safe
         self._save_map = save_map
         self._features = defaultdict(set)  # What happens when we serialize? This will be 2E6 big...
 
@@ -1395,7 +1463,7 @@ class MurmurFolder(Configurable):
     def assign_feature(self, substructures):
         if not is_iterable(substructures):
             substructures = (substructures,)
-        features = self.hash(substructures) % self.fold_size  # TODO: there is a bug here, no?
+        features = self.hash(substructures) % self.fold_size
         if self._save_map:
             for feature, key in zip(features, substructures):
                 self._features[feature].add(key)
@@ -1405,7 +1473,7 @@ class MurmurFolder(Configurable):
         return sorted(self._features[feature])
 
     def fold(self, X):
-        return fold_csr(X, self)
+        return fold_csr(X, self, safe=self._safe, binary=self.as_binary, as_float=self.as_float)
 
     def folded2unfolded(self):
         """Return a numpy array with bucket assignments for each original feature.
