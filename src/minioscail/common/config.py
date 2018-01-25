@@ -356,11 +356,20 @@ def parse_id_string(id_string, parse_nested=True, infer_numbers=True, remove_quo
         raise Exception('Cannot parse empty configuration strings')
 
     # Parse
-    splitter = shlex.shlex(instream=id_string)  # shlex works with our simple syntax
-    splitter.wordchars += '.'                   # so numbers are not splitted...
-    splitter.whitespace = '#'
-    splitter.whitespace_split = False
-    parameters = list(splitter)
+    if '#' in id_string:
+        # Newer versions (still pre whatami 4)
+        splitter = shlex.shlex(instream=id_string)  # shlex works with our simple syntax
+        splitter.wordchars += '.'                   # so numbers are not splitted...
+        splitter.whitespace = '#'
+        splitter.whitespace_split = False
+        parameters = list(splitter)
+    else:
+        # Quick and dirty parsing of old strings
+        splitted = id_string.split('__')
+        parameters = [splitted[0]]
+        for kv in splitted[1:]:
+            k, v = kv.split('=')
+            parameters += [k, '=', v]
     name = parameters[0]
     if not len(parameters[1::3]) == len(parameters[3::3]):
         raise Exception('Splitting has not worked. Missing at least one key or a value.')
