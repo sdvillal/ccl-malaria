@@ -114,10 +114,11 @@ def logreg_experiments_to_deploy():
     return deployers
 
 
-def deployment_models(with_bug=False):
-    df = logreg_experiments_to_deploy()
+def deployment_models(deployers_df=None, with_bug=False):
+    if deployers_df is None:
+        deployers_df = logreg_experiments_to_deploy()
     return [res.fold_model(fold, with_bug=with_bug)
-            for res in df.result for fold in res.present_folds()]
+            for res in deployers_df.result for fold in res.present_folds()]
     # But we need also to specify what the input to the model looks like...
     # So this should infer feature extraction and preprocessing (all possible from the df)
 
