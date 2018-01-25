@@ -848,7 +848,8 @@ def zero_columns(X, columns, zero_other=False):
         to_zero[columns] = 0
         columns = np.where(to_zero)[0]
     for col in columns:  # This for is the hotspot ATM
-        X.data[X.indptr[col]:X.indptr[col+1]] = 0
+        if col < num_cols:
+            X.data[X.indptr[col]:X.indptr[col+1]] = 0
     X.eliminate_zeros()
     return X.tocsr()
 
@@ -937,7 +938,7 @@ class MalariaFingerprintsManager(object):
         return self._i2s_cache()[i]
 
     def substructures(self):
-        """Returns a numpy of substructures corresponding to columns in the matrix."""
+        """Returns a numpy array of substructures corresponding to columns in the matrix."""
         return self._i2s_cache()
 
     def duplicate_features_representatives(self, transductive=True):
@@ -1087,7 +1088,7 @@ class MalariaFingerprintsManager(object):
         self._features = defaultdict(set)
 
 
-def fold_csr(X, folder, slow=False):
+def fold_csr(X, folder, slow=False, binary=True, binary_as_bool=False):
     """A convenience method to fold a CSR sparse matrix using a folder (hashing + bucket assignment method)."""
     X = X.tocsr()
     # Is there an efficient way of doing this for the whole matrix?
@@ -1109,8 +1110,10 @@ def fold_csr(X, folder, slow=False):
         rows.fill(row_num)
         return rows
     rows = np.hstack([rowindices(i, len(c)) for i, c in enumerate(cols)])
-    # noinspection PyTypeChecker
-    data = np.ones(len(rows), dtype=np.float)  # dtype=np.bool
+    if binary:
+        data = np.ones(len(rows), dtype=(np.bool if binary_as_bool else np.float))
+    else:
+        raise NotImplementedError()
     return coo_matrix((data, (rows, np.hstack(cols))), shape=(X.shape[0], folder.fold_size)).tocsr()
 
 
