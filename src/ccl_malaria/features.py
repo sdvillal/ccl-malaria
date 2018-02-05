@@ -1346,6 +1346,10 @@ class MalariaFingerprintsManager(object):
     def clear_cache(self):
         self._features = defaultdict(set)
 
+    @property
+    def original_file(self):
+        return self._original_file
+
 
 def fold_csr(X, folder, safe=True, binary=True, as_float=False):
     """A convenience method to fold a CSR sparse matrix using a folder (hashing + bucket assignment method)."""
