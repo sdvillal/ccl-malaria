@@ -2,31 +2,17 @@
 
 [First see why?](http://www.tdtproject.org/challenge-1---malaria-hts.html).
 
+This is a 2017 installment of the original code [here](https://github.com/sdvillal/ccl-malaria/tree/original-submission).
+
 ## Installation
 
-First we need to install all the dependencies:
-
-- python (scientific) libraries:
-   * numpy >= 1.7
-   * scipy >= 0.13
-   * cython >= 0.19
-   * scikit-learn >= 0.14
-   * pandas >= 0.13
-   * joblib >= 0.8
-   * h5py >= 2.2.1
-   * argh >=0.21
-- for cheminformatics, [rdkit >= R2013_09](http://www.rdkit.org/docs/Install.html)
-
-The easiest way to get (1) done is to install the free
-[anaconda python scientific distribution](https://store.continuum.io/cshop/anaconda/)
-and then complete the installation of the missing libraries by running:
+Use conda.
 
 ```sh
-pip install argh joblib
-```
+git clone https://github.com/sdvillal/ccl-malaria.git
+cd src
+conda install -f environment.yaml```
 
-Then, we just need to install CCL-Malaria by decompressing a distribution package or
-cloning the [latest version from github](https://github.com/sdvillal/ccl-malaria).
 
 ## Running
 
